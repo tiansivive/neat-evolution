@@ -12,8 +12,8 @@ import Data.Int (toNumber)
 import Data.Vector (Two, Vec(..), scale, vAdd, x, y)
 import Data.Vector as V
 import Effect (Effect)
-import Effect.Class (liftEffect)
-import Effect.Console (log)
+
+
 import Effect.Random (randomInt, randomRange)
 import Geometry (BoundingBox, Degrees, Position(..))
 import Graphics.Canvas (arc, beginPath, closePath, fillPath, lineTo, moveTo, setFillStyle, setStrokeStyle, stroke)
@@ -44,7 +44,7 @@ create = ask >>= \{ board: { width, height } } ->
             x <- randomRange 0.0 1.0
             let y = 1.0 - x 
             pure $ Vec [x, y]
-    in liftEffect $ do
+    in lift $ do
         radius <- radiusE
         speed <- speedE
         color <- colorE
@@ -62,7 +62,7 @@ boundingBox c = {
 }
 
 draw :: Creature -> App Unit
-draw { pos, radius, color, orientation, debug, hover } = ask >>= \{ ctx } -> liftEffect $ do
+draw { pos, radius, color, orientation, debug, hover } = ask >>= \{ ctx } -> lift $ do
     if debug || hover then do 
         let tip = 50.0 `scale` orientation `vAdd` pos
         beginPath ctx

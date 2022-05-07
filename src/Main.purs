@@ -6,16 +6,14 @@ module Main
 
 import Prelude
 
-import Control.Monad.Reader (ask, runReaderT)
-import Data.Maybe (fromJust, maybe)
+import Control.Monad.Reader (runReaderT)
+import Data.Maybe (fromJust)
 import Effect (Effect)
-import Effect.Class (liftEffect)
 import Effect.Console (log)
 import Effect.Ref as Ref
 import Graphics.Canvas (getCanvasElementById, getContext2D)
 import Partial.Unsafe (unsafePartial)
-import Simulation (clickListener, mouseOverListener, spawn, step, init)
-import Simulation.Types (App)
+import Simulation (handleMouseEvents, init)
 import Web.DOM.Document (toNonElementParentNode)
 import Web.DOM.NonElementParentNode (getElementById)
 import Web.Event.EventTarget (addEventListener)
@@ -26,14 +24,9 @@ import Web.HTML.HTMLDocument (toDocument)
 import Web.HTML.Window (document, requestAnimationFrame)
 import Web.UIEvent.MouseEvent.EventTypes (mousemove)
 
--- import Web.HTML.Window (requestAnimationFrame)
-
-
-
 
 nCreatures :: Int
 nCreatures = 100
-
 
 
 main :: Effect Unit
@@ -41,24 +34,19 @@ main = unsafePartial $ do
     log "Booting up!"
     w <- window
     doc <- document w
-    mcanvas <- getCanvasElementById "canvas"
-    mcanvasEl <- getElementById "canvas" (toNonElementParentNode $ toDocument doc)
+    canvas <- fromJust <$> getCanvasElementById "canvas"
+    canvasEl <- fromJust <$> getElementById "canvas" (toNonElementParentNode $ toDocument doc)
+    ctx <- getContext2D canvas
     state <- Ref.new { creatures: [] }
 
-    let cb = maybe (log "No canvas element found!") 
-          (\canvas -> do
-            ctx <- getContext2D canvas
-            runReaderT (init nCreatures) { state, ctx, window: w, board: { width: 720, height: 400 } }
-          ) 
-          mcanvas
-    void $ requestAnimationFrame cb w
+    let env = { state, ctx, window: w, board: { width: 720, height: 400 } }
+    let target = toEventTarget $ fromJust $ fromElement $ canvasEl 
     
-    let target = unsafePartial $ toEventTarget $ fromJust $ fromElement $ fromJust mcanvasEl 
-    cl <- clickListener state
-    mml <- mouseOverListener state
-    addEventListener click cl true target
-    addEventListener mousemove mml true target
+    handler <- runReaderT handleMouseEvents env
+    addEventListener click handler true target
+    addEventListener mousemove handler true target
 
+    void $ requestAnimationFrame (runReaderT (init nCreatures) env) w
     
 
 

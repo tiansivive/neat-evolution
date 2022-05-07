@@ -2,9 +2,8 @@ module Board where
 
 import Prelude
 
-import Control.Monad.Reader (Reader, ask)
+import Control.Monad.Reader (Reader, ask, lift)
 import Data.Int (toNumber)
-import Effect.Class (liftEffect)
 import Geometry (BoundingBox)
 import Graphics.Canvas (fillPath, rect, setFillStyle)
 import Simulation.Types (Environment, App)
@@ -14,7 +13,7 @@ import Simulation.Types (Environment, App)
 draw :: App Unit
 draw = do
     { ctx, board : { width, height } } <- ask
-    liftEffect do
+    lift do
         setFillStyle ctx "#EDEDED"
         fillPath ctx $ rect ctx
             { x: 0.0
