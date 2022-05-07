@@ -28,6 +28,7 @@ to generate this file without the comments in this block.
   , "prelude"
   , "psci-support"
   , "random"
+  , "refs"
   , "transformers"
   , "tuples"
   , "web-dom"
