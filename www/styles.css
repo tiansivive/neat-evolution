@@ -1,0 +1,6 @@
+body {
+    display: flex;
+    direction: row;
+    justify-content: start;
+}
+

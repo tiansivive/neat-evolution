@@ -17,19 +17,20 @@ import Data.Array (replicate)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (sequence, sequence_)
+import Debug (spy, traceM)
 import Effect (Effect)
-import Effect.Console (log)
+import Effect.Console (error)
 import Effect.Ref as Ref
 import Effect.Timer (setTimeout)
 import Geometry (Position(..))
 import Simulation.Types (App, Creature)
-import Web.Event.Event (EventType(..)) 
-import Web.Event.Event (target, type_)  as Evt
+import Web.Event.Event (EventType(..))
+import Web.Event.Event (target, type_) as Evt
 import Web.Event.EventTarget (EventListener, eventListener)
 import Web.Event.Internal.Types (Event)
 import Web.HTML.HTMLCanvasElement (fromEventTarget, toHTMLElement) as Canvas
 import Web.HTML.HTMLElement (offsetLeft, offsetTop) as HTML
-import Web.HTML.Window (requestAnimationFrame)
+import Web.HTML.Window (RequestAnimationFrameId, requestAnimationFrame)
 import Web.UIEvent.MouseEvent (clientX, clientY, fromEvent) as ME
 
 
@@ -47,9 +48,7 @@ coordinates evt = do
     pure $ do
         left <- leftE
         top <- topE
-        let p = Pos { x: x - left, y: y - top}
-        log $ "Coordinates: " <> show p
-        pure p
+        pure $ spy "Coordinates:" $ Pos { x: x - left, y: y - top}
 
 handleMouseEvents :: App EventListener
 handleMouseEvents = 
@@ -68,15 +67,14 @@ handleMouseEvents =
       { creatures } <- Ref.read state
       mp <- sequence $ coordinates e
       case mp of
-        Nothing -> log $ "Could not calculate coordinates for mouse event"
+        Nothing -> error $ "Could not calculate coordinates for mouse event"
         Just p -> Ref.modify_ _ { creatures = toggleDebugOptions e p <$> creatures } state
     
 
 
-time :: App Unit
+time :: App RequestAnimationFrameId
 time = do
-  lift $ log "running update"
-
+  traceM "Time update"
   deps@{ state, window } <- ask
   { creatures } <- lift $ Ref.read state
   updated <- sequence $ map C.update creatures
@@ -85,13 +83,13 @@ time = do
   B.draw
   sequence_ $ map C.draw updated
 
-  let next = (runReaderT time) deps
-  let eff = setTimeout 100 next
-  void $ lift $ requestAnimationFrame (void eff) window
+  let next = void $ runReaderT time deps
+  let eff = setTimeout 250 next
+  lift $ requestAnimationFrame (void eff) window
 
 
         
-step:: App Unit
+step:: App RequestAnimationFrameId
 step = do
   deps@{ state, window } <- ask
   { creatures } <- lift $ Ref.read state
@@ -99,14 +97,14 @@ step = do
   _ <- lift $ Ref.modify _ { creatures = updated } state
   B.draw 
   sequence_ $ map C.draw updated
-  void $ lift $ requestAnimationFrame (runReaderT step deps) window
+  lift $ requestAnimationFrame (runReaderT (void step) deps) window
 
 
 spawn :: Int -> App (Array Creature)
 spawn n = sequence $ replicate n C.create 
 
 
-init :: Int -> App Unit
+init :: Int -> App RequestAnimationFrameId
 init n = do 
   new <- spawn n
   { state } <- ask

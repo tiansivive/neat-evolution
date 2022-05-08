@@ -2,32 +2,33 @@ module Board where
 
 import Prelude
 
-import Control.Monad.Reader (Reader, ask, lift)
+import Control.Monad.Reader (ask, lift)
 import Data.Int (toNumber)
+import Effect.Ref as Ref
 import Geometry (BoundingBox)
 import Graphics.Canvas (fillPath, rect, setFillStyle)
-import Simulation.Types (Environment, App)
-
-
+import Simulation.Types (App)
 
 draw :: App Unit
 draw = do
-    { ctx, board : { width, height } } <- ask
+    { ctx, state } <- ask
+    { board } <- lift $ Ref.read state
     lift do
         setFillStyle ctx "#EDEDED"
         fillPath ctx $ rect ctx
             { x: 0.0
             , y: 0.0
-            , width: toNumber width
-            , height: toNumber height
+            , width: toNumber board.width
+            , height: toNumber board.height
             }
 
-checkOutOfBounds :: BoundingBox -> Reader Environment Boolean
+checkOutOfBounds :: BoundingBox -> App Boolean
 checkOutOfBounds { max, min } = do
-    { board: { width, height }} <- ask
-    pure $ ( max.x >= toNumber width) 
+    { state } <- ask
+    { board } <- lift $ Ref.read state
+    pure $ ( max.x >= toNumber board.width) 
         ||  (min.x <= 0.0) 
-        ||  (max.y >= toNumber height) 
+        ||  (max.y >= toNumber board.height) 
         ||  (min.y <= 0.0) 
 
 

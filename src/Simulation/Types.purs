@@ -9,22 +9,25 @@ import Effect (Effect)
 import Effect.Ref (Ref)
 import Graphics.Canvas (Context2D)
 import Web.HTML (Window)
+import Web.HTML.Window (RequestAnimationFrameId)
 
 
 type Bounds = { w:: Number, h:: Number}
 
 type Environment = 
     { state         :: Ref State
-    , board         :: 
-        { width     :: Int
-        , height    :: Int
-        } 
     , ctx           :: Context2D    
     , window        :: Window
+    , frameId       :: RequestAnimationFrameId
     }
 
 type State =
-    { creatures     :: Array Creature }
+    { creatures     :: Array Creature
+    , board         ::
+        { width     :: Int
+        , height    :: Int
+        }
+    }
 
 
 type Creature = 

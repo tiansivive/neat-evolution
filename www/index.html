@@ -1,17 +1,30 @@
 <head>
     <title>Neural Network Evolution</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <!-- <div>
+    <main>
+        <canvas id="board" width="720" height="400" />
+    </main>
+    <section id="config">
+    
+        <fieldset>
+            <legend>Config</legend>
+        
+            <label>Width: </label>
+            <input name="width" value="720" type="number" />
+
+            <label>Height: </label>
+            <input name="height" value="400" type="number" />
+
+            <label>Number of creatures: </label>
+            <input name="creatures" value="100" type="number" />
+        </fieldset>
+        <button>Reset</button>
+     
         <span>
-            <label>Width:</label>
-            <input value="120" type="number" id="widthInput"/>
-        </span>
-        <span>
-            <label>Height:</label>
-            <input value="120" type="number" id="heighInput"/>
-        </span>
-    </div> -->
-    <canvas id="canvas" width="720" height="400" />
+            <canvas id="closeup" width="200" height="200">
+        </span>  
+    </section>
     <script src="./index.js" type="text/javascript"/>
 </body>

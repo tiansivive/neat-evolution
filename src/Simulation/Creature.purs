@@ -8,23 +8,26 @@ import Board (checkOutOfBounds)
 import Color (rgb, toHexString)
 import Control.Monad.Cont.Trans (lift)
 import Control.Monad.Reader (ask)
+import Control.Monad.Rec.Class (Step(..), tailRecM)
 import Data.Int (toNumber)
 import Data.Vector (Two, Vec(..), scale, vAdd, x, y)
 import Data.Vector as V
+import Debug (spy)
 import Effect (Effect)
-
-
 import Effect.Random (randomInt, randomRange)
+import Effect.Ref as Ref
 import Geometry (BoundingBox, Degrees, Position(..))
 import Graphics.Canvas (arc, beginPath, closePath, fillPath, lineTo, moveTo, setFillStyle, setStrokeStyle, stroke)
 import Math as Number
-import Simulation.Types (App, Creature, Event(..), fromReader)
+import Simulation.Types (App, Creature, Event(..))
 
 
 
 
 create :: App Creature
-create = ask >>= \{ board: { width, height } } -> 
+create = do
+    { state } <- ask
+    { board } <- lift $ Ref.read state
     let 
         radiusE = map toNumber $ randomInt 5 10
         speedE = randomInt 1 2
@@ -35,8 +38,8 @@ create = ask >>= \{ board: { width, height } } ->
             pure $ rgb r g b 
         posE = do
             r <- radiusE
-            x <- randomRange r $ (toNumber width - r)
-            y <- randomRange r $ (toNumber height - r)
+            x <- randomRange r $ (toNumber board.width - r)
+            y <- randomRange r $ (toNumber board.height - r)
             pure $ Vec $ [x, y]
 
         orientationE :: Effect (Vec Two Number)
@@ -44,7 +47,8 @@ create = ask >>= \{ board: { width, height } } ->
             x <- randomRange 0.0 1.0
             let y = 1.0 - x 
             pure $ Vec [x, y]
-    in lift $ do
+
+    lift $ do
         radius <- radiusE
         speed <- speedE
         color <- colorE
@@ -103,27 +107,20 @@ rotate angle c = c { orientation = V.rotate angle c.orientation }
 
 
 
-action :: Event -> Creature -> App Creature
-action Move c = 
-    -- log $ "Current pos: " <> show c.pos
-    -- let m = move c
-    -- log $ "Moved pos: " <> show m.pos
-    pure $ move c
-action HitEdge c = do
-    -- lift $ log "Hit Edge"
-    angle <- lift $ randomRange 0.0 360.0 
-    let rc = rotate angle c
-    let test = move rc
-    out <- fromReader $ checkOutOfBounds $ boundingBox test
-    -- lift $ log $ "Out: " <> show out
+dispatch :: Event -> Creature -> App Creature
+dispatch Move c = pure $ move c
+dispatch HitEdge c = tailRecM go c
+    where
+        go _c = do
+            angle <- lift $ randomRange 0.0 360.0
+            
+            let rotated = rotate angle _c
+            out <- checkOutOfBounds $ boundingBox $ move rotated
+      
+            pure $ if out 
+                then Loop _c
+                else Done $ move rotated
 
-    -- log $ "Angle: " <> show angle
-    -- log $ "Current pos: " <> show c.pos
-    -- log $ "Moved rotated pos: " <> show test.pos   
-    -- log $ "Is out of bounds: " <> (show out)
-    if out 
-        then action HitEdge c
-        else pure $ move rc
 
    
 
@@ -131,10 +128,10 @@ action HitEdge c = do
       
 update :: Creature -> App Creature
 update c = do
-    out <- fromReader $ checkOutOfBounds $ boundingBox c 
+    out <- checkOutOfBounds $ boundingBox c 
     case out of
-        true -> action HitEdge c
-        false -> action Move c    
+        true -> dispatch HitEdge c
+        false -> dispatch Move c    
 
 
 intersects :: Position -> Creature -> Boolean

@@ -6,7 +6,7 @@ import Control.Apply (lift2)
 import Data.Array (index, length, replicate, zipWith)
 import Data.Foldable (class Foldable, foldl, foldr)
 import Data.Maybe (fromJust)
-import Effect.Unsafe (unsafePerformEffect)
+
 import Geometry (toRads)
 import Math (sqrt, cos, sin)
 import Partial (crashWith)
