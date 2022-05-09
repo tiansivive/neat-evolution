@@ -68,7 +68,7 @@ boundingBox c = {
 draw :: Creature -> App Unit
 draw { pos, radius, color, orientation, debug, hover } = ask >>= \{ ctx } -> lift $ do
     if debug || hover then do 
-        let tip = 50.0 `scale` orientation `vAdd` pos
+        let tip = (radius * 5.0) `scale` orientation `vAdd` pos
         beginPath ctx
         setStrokeStyle ctx "red"
         moveTo ctx (x pos) (y pos)

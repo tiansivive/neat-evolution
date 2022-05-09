@@ -13,7 +13,7 @@ import Board as B
 import Control.Monad.Reader (lift, runReaderT)
 import Control.Monad.Reader.Trans (ask)
 import Creature (create, draw, intersects, update) as C
-import Data.Array (replicate)
+import Data.Array (filter, index, replicate)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (sequence, sequence_)
@@ -23,7 +23,7 @@ import Effect.Console (error)
 import Effect.Ref as Ref
 import Effect.Timer (setTimeout)
 import Geometry (Position(..))
-import Simulation.Types (App, Creature)
+import Simulation.Types (App, Creature, State)
 import Web.Event.Event (EventType(..))
 import Web.Event.Event (target, type_) as Evt
 import Web.Event.EventTarget (EventListener, eventListener)
@@ -48,19 +48,23 @@ coordinates evt = do
     pure $ do
         left <- leftE
         top <- topE
-        pure $ spy "Coordinates:" $ Pos { x: x - left, y: y - top}
+        pure $ Pos { x: x - left, y: y - top}
 
 handleMouseEvents :: App EventListener
 handleMouseEvents = 
   let
-    toggleDebugOptions :: Event -> Position -> Creature -> Creature
-    toggleDebugOptions e p c = 
+    handleEventFor :: Ref.Ref State -> Event -> Position -> Array Creature -> Effect Unit
+    handleEventFor state e p creatures = 
       let 
         hit = C.intersects p 
+        toggleDebug c = if hit c then c { debug = true } else c { debug = false}
+        toggleHover c =  if hit c then c { hover = true } else c { hover = false}
+        updated = toggleDebug <$> creatures
+        selected = filter (\c -> c.debug) updated
       in case Evt.type_ e of
-        EventType "click" -> if hit c then c { debug = true } else c { debug = false}
-        EventType "mousemove" -> if hit c then c { hover = true } else c { hover = false}
-        _ -> c
+        EventType "click" -> Ref.modify_ _ { creatures = updated, selected = spy "Selected" selected, closeUp = spy "closeup" $ index selected 0 } state
+        EventType "mousemove" ->  Ref.modify_ _ { creatures = toggleHover <$> creatures } state
+        _ -> pure unit
   in do
     { state } <- ask
     lift $ eventListener $ \e -> do
@@ -68,7 +72,9 @@ handleMouseEvents =
       mp <- sequence $ coordinates e
       case mp of
         Nothing -> error $ "Could not calculate coordinates for mouse event"
-        Just p -> Ref.modify_ _ { creatures = toggleDebugOptions e p <$> creatures } state
+        Just p -> handleEventFor state e p creatures
+          
+          
     
 
 

@@ -4,6 +4,7 @@ import Prelude
 
 import Color (Color)
 import Control.Monad.Reader (Reader, ReaderT, asks, runReader)
+import Data.Maybe (Maybe)
 import Data.Vector (Two, Vec)
 import Effect (Effect)
 import Effect.Ref (Ref)
@@ -21,12 +22,16 @@ type Environment =
     , frameId       :: RequestAnimationFrameId
     }
 
+-- TODO: Encode the relationship between closeUp and selected into the type signature, perhaps via some ADT
 type State =
     { creatures     :: Array Creature
+    , selected      :: Array Creature
+    , closeUp       :: Maybe Creature
     , board         ::
         { width     :: Int
         , height    :: Int
         }
+    , ui            :: UiState
     }
 
 
@@ -40,6 +45,19 @@ type Creature =
     , hover :: Boolean
     } 
 data Event = HitEdge | Move
+
+
+type HabitatConfig =  
+    { width     :: Int
+    , height    :: Int
+    }
+
+type Config = 
+    { population    :: Int
+    , habitat       :: HabitatConfig
+    }
+    
+data UiState = Init Config | Running | Paused | Done
 
 type App = ReaderT Environment Effect
 

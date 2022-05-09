@@ -8,13 +8,14 @@ import Prelude
 
 import Control.Monad.Reader (runReaderT)
 import Data.Int (fromString)
-import Data.Maybe (fromJust)
+import Data.Maybe (Maybe(..), fromJust)
 import Effect (Effect)
 import Effect.Console (log)
 import Effect.Ref as Ref
 import Graphics.Canvas (getCanvasElementById, getContext2D)
 import Partial.Unsafe (unsafePartial)
 import Simulation (handleMouseEvents, init)
+import Simulation.Closeup (draw, step) as CloseUp
 import Simulation.UI (handleReset)
 import Web.DOM.Document (toNonElementParentNode)
 import Web.DOM.Element (toEventTarget)
@@ -35,9 +36,10 @@ main = unsafePartial $ do
     log "Booting up!"
     w <- window
     doc <- document w
-    canvas <- fromJust <$> getCanvasElementById "board"
-    canvasEl <- fromJust <$> getElementById "board" (toNonElementParentNode $ toDocument doc)
-    ctx <- getContext2D canvas
+    mainCanvas <- fromJust <$> getCanvasElementById "board"
+    closeUpCanvas <- fromJust <$> getCanvasElementById "closeup"
+    mainCanvasEl <- fromJust <$> getElementById "board" (toNonElementParentNode $ toDocument doc)
+    ctx <- getContext2D mainCanvas
 
   
     wInput <- fromJust <$> querySelector (QuerySelector "input[name=width]") (toParentNode doc)
@@ -50,17 +52,18 @@ main = unsafePartial $ do
     n <- (fromJust <<< fromString) <$> (Input.value $ fromJust $ Input.fromElement cInput)
 
     dummy <- requestAnimationFrame (pure unit) w
-    state <- Ref.new { creatures: [], board: { width, height } }
+    state <- Ref.new { creatures: [], selected: [], closeUp: Nothing, board: { width, height } }
 
     let env = { state, ctx, window: w, frameId: dummy }
-    let target = toEventTarget canvasEl 
+    let target = toEventTarget mainCanvasEl 
     
     handler <- runReaderT handleMouseEvents env
     addEventListener click handler true target
     addEventListener mousemove handler true target
     
-    let eff = void $ runReaderT (init n) env
-    void $ requestAnimationFrame eff w
+    let eff = getContext2D closeUpCanvas >>= \closeUpCtx -> runReaderT CloseUp.step env { ctx = closeUpCtx } >>= \_ ->  runReaderT (init n) env 
+    
+    void $ requestAnimationFrame (void eff) w
     
     let btnTarget = toEventTarget resetBtn
     handlerBtn <- runReaderT (handleReset doc) env
