@@ -2,5 +2,26 @@ body {
     display: flex;
     direction: row;
     justify-content: start;
+    margin-top: 2rem;
+}
+
+section#config {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    margin: 0 2rem;
+}
+
+fieldset {
+    margin-bottom: 1rem;
+    width: 350px;
+}
+
+input {
+    margin-bottom: 4px;
+}
+
+canvas#closeup {
+    margin-right: 1rem;
 }
 

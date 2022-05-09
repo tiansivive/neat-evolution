@@ -124,12 +124,14 @@ loop =
   in do 
     { state, window } <- ask
     { ui } <- lift $ Ref.read state
-    case spy "ui" ui of
+    case ui of
+      Paused -> lift $ requestAnimationFrame (pure unit) window
       Init conf -> do 
         new <- spawn conf.population
         lift $ updateCanvas window conf
         lift $ Ref.modify_ _ { creatures = new, selected = [], closeUp = Nothing, habitat = conf.habitat, ui = Running } state
         step
+      Running -> step
       _ -> step
    
  

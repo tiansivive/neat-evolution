@@ -7,24 +7,27 @@
         <canvas id="board" width="1720" height="400" />
     </main>
     <section id="config">
-    
+        <span>
+            <canvas id="closeup" width="200" height="200">
+        </span>  
         <fieldset>
             <legend>Config</legend>
         
             <label>Width: </label>
-            <input name="width" value="1720" type="number" />
-
+            <input name="width" value="600" type="number" />
+            <br />
             <label>Height: </label>
-            <input name="height" value="400" type="number" />
-
+            <input name="height" value="300" type="number" />
+            <br />
             <label>Number of creatures: </label>
-            <input name="creatures" value="100" type="number" />
+            <input name="creatures" value="10" type="number" />
+            <br />
+            <button name="reset">Reset</button>
+            <button name="pause" hidden>Pause</button>
+            <button name="play" hidden>Play</button>
         </fieldset>
-        <button>Reset</button>
      
-        <span>
-            <canvas id="closeup" width="200" height="200">
-        </span>  
+       
     </section>
     <script src="./index.js" type="text/javascript"/>
 </body>

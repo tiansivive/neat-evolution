@@ -18,9 +18,15 @@ import Web.HTML.HTMLDocument (HTMLDocument, toParentNode)
 import Web.HTML.HTMLInputElement (fromElement, value) as Input
 import Web.HTML.Window (document)
 
-handleReset :: App EventListener
-handleReset = let
-    handler w s _ = unsafePartial $ do
+
+data Signal = Reset | Pause | Play
+
+
+handleBtnClick :: Signal -> App EventListener
+handleBtnClick msg = let
+    handler Play s _ _ = Ref.modify_ _ {  ui = Running } s
+    handler Pause s _ _ = Ref.modify_ _ {  ui = Paused } s
+    handler Reset s w _ = unsafePartial $ do
 
         doc <- document w
         wInput <- fromJust <$> querySelector (QuerySelector "input[name=width]") (toParentNode doc)
@@ -35,4 +41,4 @@ handleReset = let
       
     in do
         { state, window } <- ask
-        lift $ eventListener $ handler window state 
+        lift $ eventListener $ handler msg state window

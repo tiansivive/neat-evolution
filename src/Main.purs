@@ -15,9 +15,9 @@ import Effect.Ref as Ref
 import Graphics.Canvas (getCanvasElementById, getContext2D)
 import Partial.Unsafe (unsafePartial)
 import Simulation (handleMouseEvents, loop)
-import Simulation.Closeup (draw, step) as CloseUp
+import Simulation.Closeup (step) as CloseUp
 import Simulation.Types (UiState(..))
-import Simulation.UI (handleReset)
+import Simulation.UI (Signal(..), handleBtnClick)
 import Web.DOM.Document (toNonElementParentNode)
 import Web.DOM.Element (toEventTarget)
 import Web.DOM.NonElementParentNode (getElementById)
@@ -46,7 +46,9 @@ main = unsafePartial $ do
     wInput <- fromJust <$> querySelector (QuerySelector "input[name=width]") (toParentNode doc)
     hInput <- fromJust <$> querySelector (QuerySelector "input[name=height]") (toParentNode doc)
     cInput <- fromJust <$> querySelector (QuerySelector "input[name=creatures]") (toParentNode doc)
-    resetBtn <- fromJust <$> querySelector (QuerySelector "#config button") (toParentNode doc)
+    resetBtn <- fromJust <$> querySelector (QuerySelector "#config button[name=reset]") (toParentNode doc)
+    pauseBtn <- fromJust <$> querySelector (QuerySelector "#config button[name=pause]") (toParentNode doc)
+    playBtn <- fromJust <$> querySelector (QuerySelector "#config button[name=play]") (toParentNode doc)
 
     width <- (fromJust <<< fromString) <$> (Input.value $ fromJust $ Input.fromElement wInput)
     height <- (fromJust <<< fromString) <$> (Input.value $ fromJust $ Input.fromElement hInput)
@@ -72,9 +74,17 @@ main = unsafePartial $ do
     
     void $ requestAnimationFrame (void eff) w
     
-    let btnTarget = toEventTarget resetBtn
-    handlerBtn <- runReaderT handleReset env
-    addEventListener click handlerBtn true btnTarget
+    let resetTarget = toEventTarget resetBtn
+    resetHandler <- runReaderT (handleBtnClick Reset) env
 
+    let pauseTarget = toEventTarget pauseBtn
+    pauseHandler <- runReaderT (handleBtnClick Pause) env
+
+    let playTarget = toEventTarget playBtn
+    playHandler <- runReaderT (handleBtnClick Pause) env
+
+    addEventListener click resetHandler true resetTarget
+    addEventListener click pauseHandler true pauseTarget
+    addEventListener click playHandler true playTarget
 
 
