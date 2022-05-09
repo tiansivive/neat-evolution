@@ -1,7 +1,7 @@
 module Simulation
   ( coordinates
   , handleMouseEvents
-  , init
+  , loop
   , spawn
   , time
   )
@@ -9,13 +9,12 @@ module Simulation
 
 import Prelude
 
-import Board as B
 import Control.Monad.Reader (lift, runReaderT)
 import Control.Monad.Reader.Trans (ask)
 import Creature (create, draw, intersects, update) as C
 import Data.Array (filter, index, replicate)
 import Data.Int (toNumber)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromJust)
 import Data.Traversable (sequence, sequence_)
 import Debug (spy, traceM)
 import Effect (Effect)
@@ -23,14 +22,18 @@ import Effect.Console (error)
 import Effect.Ref as Ref
 import Effect.Timer (setTimeout)
 import Geometry (Position(..))
-import Simulation.Types (App, Creature, State)
+import Habitat as Habitat
+import Simulation.Types (App, Creature, State, UiState(..), Config)
+import Web.DOM.Element (QuerySelector, setAttribute)
+import Web.DOM.ParentNode (QuerySelector(..), querySelector)
 import Web.Event.Event (EventType(..))
 import Web.Event.Event (target, type_) as Evt
 import Web.Event.EventTarget (EventListener, eventListener)
 import Web.Event.Internal.Types (Event)
 import Web.HTML.HTMLCanvasElement (fromEventTarget, toHTMLElement) as Canvas
+import Web.HTML.HTMLDocument (HTMLDocument, toParentNode)
 import Web.HTML.HTMLElement (offsetLeft, offsetTop) as HTML
-import Web.HTML.Window (RequestAnimationFrameId, requestAnimationFrame)
+import Web.HTML.Window (RequestAnimationFrameId, document, requestAnimationFrame)
 import Web.UIEvent.MouseEvent (clientX, clientY, fromEvent) as ME
 
 
@@ -86,7 +89,7 @@ time = do
   updated <- sequence $ map C.update creatures
   _ <- lift $ Ref.modify _ { creatures = updated } state
   
-  B.draw
+  Habitat.draw
   sequence_ $ map C.draw updated
 
   let next = void $ runReaderT time deps
@@ -95,25 +98,38 @@ time = do
 
 
         
-step:: App RequestAnimationFrameId
+step:: Partial => App RequestAnimationFrameId
 step = do
   deps@{ state, window } <- ask
   { creatures } <- lift $ Ref.read state
   updated <- sequence $ map C.update creatures
   _ <- lift $ Ref.modify _ { creatures = updated } state
-  B.draw 
+  Habitat.draw 
   sequence_ $ map C.draw updated
-  lift $ requestAnimationFrame (runReaderT (void step) deps) window
+  lift $ requestAnimationFrame (runReaderT (void loop) deps) window
 
 
 spawn :: Int -> App (Array Creature)
 spawn n = sequence $ replicate n C.create 
 
 
-init :: Int -> App RequestAnimationFrameId
-init n = do 
-  new <- spawn n
-  { state } <- ask
-  lift $ Ref.modify_ _ { creatures = new } state
-  step
+loop :: Partial => App RequestAnimationFrameId
+loop = 
+  let
+    updateCanvas w conf = do
+      doc <- document w
+      canvas <- fromJust <$> querySelector (QuerySelector "#board") (toParentNode doc)
+      setAttribute "width" (show conf.habitat.width) canvas
+      setAttribute "height" (show conf.habitat.height) canvas
+  in do 
+    { state, window } <- ask
+    { ui } <- lift $ Ref.read state
+    case spy "ui" ui of
+      Init conf -> do 
+        new <- spawn conf.population
+        lift $ updateCanvas window conf
+        lift $ Ref.modify_ _ { creatures = new, selected = [], closeUp = Nothing, habitat = conf.habitat, ui = Running } state
+        step
+      _ -> step
+   
  

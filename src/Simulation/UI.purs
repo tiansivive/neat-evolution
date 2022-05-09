@@ -10,33 +10,29 @@ import Effect.Ref as Ref
 import Graphics.Canvas (getCanvasElementById)
 import Partial.Unsafe (unsafePartial)
 import Simulation (spawn)
-import Simulation.Types (App)
+import Simulation.Types (App, UiState(..))
 import Web.DOM.Element (setAttribute)
 import Web.DOM.ParentNode (QuerySelector(..), querySelector)
 import Web.Event.EventTarget (EventListener, eventListener)
 import Web.HTML.HTMLDocument (HTMLDocument, toParentNode)
 import Web.HTML.HTMLInputElement (fromElement, value) as Input
+import Web.HTML.Window (document)
 
-handleReset :: HTMLDocument -> App EventListener
-handleReset doc = let
-    handler s _ = unsafePartial $ do
+handleReset :: App EventListener
+handleReset = let
+    handler w s _ = unsafePartial $ do
 
-        canvas <- fromJust <$> querySelector (QuerySelector "#board") (toParentNode doc)
-        
+        doc <- document w
         wInput <- fromJust <$> querySelector (QuerySelector "input[name=width]") (toParentNode doc)
         hInput <- fromJust <$> querySelector (QuerySelector "input[name=height]") (toParentNode doc)
         cInput <- fromJust <$> querySelector (QuerySelector "input[name=creatures]") (toParentNode doc)
 
-
         width <- (fromJust <<< fromString) <$> (Input.value $ fromJust $ Input.fromElement wInput)
         height <- (fromJust <<< fromString) <$> (Input.value $ fromJust $ Input.fromElement hInput)
         n <- (fromJust <<< fromString) <$> (Input.value $ fromJust $ Input.fromElement cInput)
-        creatures <- runReaderT (spawn $ spy "New creatures amount" n) s
-
-        setAttribute "width" (show width) canvas
-        setAttribute "height" (show height) canvas
-        Ref.modify_ _ { creatures = creatures, board = { width, height } } s.state
+        
+        Ref.modify_ _ {  ui = Init { population: spy "New creatures:" n, habitat: spy "New habitat: " { width, height } } } s
       
     in do
-        env <- ask
-        lift $ eventListener $ handler env 
+        { state, window } <- ask
+        lift $ eventListener $ handler window state 

@@ -1,4 +1,4 @@
-module Board where
+module Habitat where
 
 import Prelude
 
@@ -12,23 +12,23 @@ import Simulation.Types (App)
 draw :: App Unit
 draw = do
     { ctx, state } <- ask
-    { board } <- lift $ Ref.read state
+    { habitat } <- lift $ Ref.read state
     lift do
         setFillStyle ctx "#EDEDED"
         fillPath ctx $ rect ctx
             { x: 0.0
             , y: 0.0
-            , width: toNumber board.width
-            , height: toNumber board.height
+            , width: toNumber habitat.width
+            , height: toNumber habitat.height
             }
 
 checkOutOfBounds :: BoundingBox -> App Boolean
 checkOutOfBounds { max, min } = do
     { state } <- ask
-    { board } <- lift $ Ref.read state
-    pure $ ( max.x >= toNumber board.width) 
+    { habitat } <- lift $ Ref.read state
+    pure $ ( max.x >= toNumber habitat.width) 
         ||  (min.x <= 0.0) 
-        ||  (max.y >= toNumber board.height) 
+        ||  (max.y >= toNumber habitat.height) 
         ||  (min.y <= 0.0) 
 
 

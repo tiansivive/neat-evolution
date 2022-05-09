@@ -27,10 +27,7 @@ type State =
     { creatures     :: Array Creature
     , selected      :: Array Creature
     , closeUp       :: Maybe Creature
-    , board         ::
-        { width     :: Int
-        , height    :: Int
-        }
+    , habitat       :: HabitatConfig
     , ui            :: UiState
     }
 
@@ -56,7 +53,7 @@ type Config =
     { population    :: Int
     , habitat       :: HabitatConfig
     }
-    
+
 data UiState = Init Config | Running | Paused | Done
 
 type App = ReaderT Environment Effect

@@ -4,7 +4,7 @@ module Creature
 
 import Prelude
 
-import Board (checkOutOfBounds)
+import Habitat (checkOutOfBounds)
 import Color (rgb, toHexString)
 import Control.Monad.Cont.Trans (lift)
 import Control.Monad.Reader (ask)
@@ -27,7 +27,7 @@ import Simulation.Types (App, Creature, Event(..))
 create :: App Creature
 create = do
     { state } <- ask
-    { board } <- lift $ Ref.read state
+    { habitat } <- lift $ Ref.read state
     let 
         radiusE = map toNumber $ randomInt 5 10
         speedE = randomInt 1 2
@@ -38,8 +38,8 @@ create = do
             pure $ rgb r g b 
         posE = do
             r <- radiusE
-            x <- randomRange r $ (toNumber board.width - r)
-            y <- randomRange r $ (toNumber board.height - r)
+            x <- randomRange r $ (toNumber habitat.width - r)
+            y <- randomRange r $ (toNumber habitat.height - r)
             pure $ Vec $ [x, y]
 
         orientationE :: Effect (Vec Two Number)
