@@ -2,19 +2,16 @@ module Simulation.UI where
 
 import Prelude
 
-import Control.Monad.Reader (ask, lift, runReaderT)
+import Control.Monad.Reader (ask, lift)
 import Data.Int (fromString)
 import Data.Maybe (fromJust)
 import Debug (spy)
 import Effect.Ref as Ref
-import Graphics.Canvas (getCanvasElementById)
 import Partial.Unsafe (unsafePartial)
-import Simulation (spawn)
 import Simulation.Types (App, UiState(..))
-import Web.DOM.Element (setAttribute)
 import Web.DOM.ParentNode (QuerySelector(..), querySelector)
 import Web.Event.EventTarget (EventListener, eventListener)
-import Web.HTML.HTMLDocument (HTMLDocument, toParentNode)
+import Web.HTML.HTMLDocument (toParentNode)
 import Web.HTML.HTMLInputElement (fromElement, value) as Input
 import Web.HTML.Window (document)
 

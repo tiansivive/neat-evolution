@@ -5,24 +5,26 @@ import Prelude
 import Control.Apply (lift2)
 import Data.Array (index, length, replicate, zipWith)
 import Data.Foldable (class Foldable, foldl, foldr)
+import Data.Maths (toRads)
 import Data.Maybe (fromJust)
 
-import Geometry (toRads)
 import Math (sqrt, cos, sin)
 import Partial (crashWith)
 import Partial.Unsafe (unsafePartial)
 import Type.Proxy (Proxy(..))
 
 
+
+
+class Sized :: forall k. k -> Constraint
+class Sized a where
+  sized :: Proxy a -> Int
+  
 data Zero
 data One
 data Two
 data Three
 data Four
-
-class Sized :: forall k. k -> Constraint
-class Sized a where
-  sized :: Proxy a -> Int
 
 instance sz :: Sized Zero where
   sized _ = 0
@@ -37,6 +39,7 @@ instance s4 :: Sized Four where
 
 newtype Vec :: forall k. k -> Type -> Type
 newtype Vec s a = Vec (Array a)
+
 
 instance eqVec :: (Eq a) => Eq (Vec s a) where
   eq (Vec l) (Vec r) = l `eq` r
@@ -54,6 +57,13 @@ instance foldableVector :: Foldable (Vec s) where
   foldr f b (Vec xs) = foldr f b xs
   foldl f b (Vec xs) = foldl f b xs
   foldMap f xs = foldr (\b acc -> f b <> acc) mempty xs
+
+instance semiringVector :: (Sized s) => Semiring (Vec s Number) where
+  add = vAdd
+  zero = fill 0.0
+  mul = vMul
+  one = fill 1.0
+
 
 fill :: forall s a. EuclideanRing a => Sized s => a -> Vec s a
 fill = Vec <<< replicate l 
@@ -80,12 +90,6 @@ vMul = lift2 (*)
 
 vNegate :: forall a s. (EuclideanRing a) => Vec s a -> Vec s a
 vNegate v = negate <$> v
-
-instance semiringVector :: (Sized s) => Semiring (Vec s Number) where
-  add = vAdd
-  zero = fill 0.0
-  mul = vMul
-  one = fill 1.0
 
 -- | The normalized direction from a to b: (a - b) / |a - b|
 direction :: forall s. Vec s Number -> Vec s Number -> Vec s Number

@@ -11,27 +11,29 @@ import Prelude
 
 import Control.Monad.Reader (lift, runReaderT)
 import Control.Monad.Reader.Trans (ask)
-import Creature (create, draw, intersects, update) as C
-import Data.Array (filter, index, replicate)
+import Creature (collided)
+import Creature (create, draw, intersects, rotate, update) as C
+import Data.Array (delete, filter, find, index, replicate)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Traversable (sequence, sequence_)
 import Debug (spy, traceM)
 import Effect (Effect)
 import Effect.Console (error)
+import Effect.Random (randomRange)
 import Effect.Ref as Ref
 import Effect.Timer (setTimeout)
 import Geometry (Position(..))
 import Habitat as Habitat
-import Simulation.Types (App, Creature, State, UiState(..), Config)
-import Web.DOM.Element (QuerySelector, setAttribute)
+import Simulation.Types (App, Creature, State, UiState(..))
+import Web.DOM.Element (setAttribute)
 import Web.DOM.ParentNode (QuerySelector(..), querySelector)
 import Web.Event.Event (EventType(..))
 import Web.Event.Event (target, type_) as Evt
 import Web.Event.EventTarget (EventListener, eventListener)
 import Web.Event.Internal.Types (Event)
 import Web.HTML.HTMLCanvasElement (fromEventTarget, toHTMLElement) as Canvas
-import Web.HTML.HTMLDocument (HTMLDocument, toParentNode)
+import Web.HTML.HTMLDocument (toParentNode)
 import Web.HTML.HTMLElement (offsetLeft, offsetTop) as HTML
 import Web.HTML.Window (RequestAnimationFrameId, document, requestAnimationFrame)
 import Web.UIEvent.MouseEvent (clientX, clientY, fromEvent) as ME
@@ -103,7 +105,8 @@ step = do
   deps@{ state, window } <- ask
   { creatures } <- lift $ Ref.read state
   updated <- sequence $ map C.update creatures
-  _ <- lift $ Ref.modify _ { creatures = updated } state
+  next <- lift $ handleCollisions updated
+  _ <- lift $ Ref.modify _ { creatures = next } state
   Habitat.draw 
   sequence_ $ map C.draw updated
   lift $ requestAnimationFrame (runReaderT (void loop) deps) window
@@ -135,3 +138,15 @@ loop =
       _ -> step
    
  
+
+handleCollisions :: Array Creature -> Effect (Array Creature)
+handleCollisions creatures = 
+  let
+    applyCollisionStrategy h = 
+      case collided h `find` (delete h creatures) of
+        Nothing -> pure h
+        Just _ -> do
+          angle <- randomRange 0.0 360.0
+          pure $ C.rotate angle h
+  in sequence $ applyCollisionStrategy <$> creatures 
+

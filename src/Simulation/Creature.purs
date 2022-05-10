@@ -4,20 +4,21 @@ module Creature
 
 import Prelude
 
-import Habitat (checkOutOfBounds)
 import Color (rgb, toHexString)
 import Control.Monad.Cont.Trans (lift)
 import Control.Monad.Reader (ask)
 import Control.Monad.Rec.Class (Step(..), tailRecM)
 import Data.Int (toNumber)
-import Data.Vector (Two, Vec(..), scale, vAdd, x, y)
+import Data.Maths (Degrees)
+import Data.Vector (Two, Vec(..), scale, vAdd, x, y, distance)
 import Data.Vector as V
 import Debug (spy)
 import Effect (Effect)
 import Effect.Random (randomInt, randomRange)
 import Effect.Ref as Ref
-import Geometry (BoundingBox, Degrees, Position(..))
+import Geometry (BoundingBox, Position(..), fromVec2)
 import Graphics.Canvas (arc, beginPath, closePath, fillPath, lineTo, moveTo, setFillStyle, setStrokeStyle, stroke)
+import Habitat (checkOutOfBounds)
 import Math as Number
 import Simulation.Types (App, Creature, Event(..))
 
@@ -143,9 +144,8 @@ intersects (Pos { x, y }) c =
     where 
         bounds = boundingBox c
         fatFingerThreshold = 5.0
-        
 
--- select :: Number -> Number -> Array Creature -> Array Creature
--- select x y = filter $ isContained x y
-   
-  
+collided :: Creature -> Creature -> Boolean
+collided c1 c2 = (distance c1.pos c2.pos) <= c1.radius + c2.radius
+
+
