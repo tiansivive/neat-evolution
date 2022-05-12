@@ -12,11 +12,10 @@ import Data.Int (toNumber)
 import Data.Maths (Degrees)
 import Data.Vector (Two, Vec(..), scale, vAdd, x, y, distance)
 import Data.Vector as V
-import Debug (spy)
 import Effect (Effect)
 import Effect.Random (randomInt, randomRange)
 import Effect.Ref as Ref
-import Geometry (BoundingBox, Position(..), fromVec2)
+import Geometry (BoundingBox, Position(..))
 import Graphics.Canvas (arc, beginPath, closePath, fillPath, lineTo, moveTo, setFillStyle, setStrokeStyle, stroke)
 import Habitat (checkOutOfBounds)
 import Math as Number
