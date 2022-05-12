@@ -37,6 +37,8 @@ instance s3 :: Sized Three where
 instance s4 :: Sized Four where
   sized _ = 4
 
+
+
 newtype Vec :: forall k. k -> Type -> Type
 newtype Vec s a = Vec (Array a)
 
