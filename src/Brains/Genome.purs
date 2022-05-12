@@ -2,12 +2,15 @@ module Brains.Genome
   ( Gene(..)
   , Genome
   , gene
+  , genome
+  , network
   )
   where
 
 import Prelude
 
 import ActivationFunction (activationFunctions)
+import Data.Array (fold)
 import Data.Array as A
 import Data.Traversable (sequence)
 import Effect (Effect)
@@ -22,17 +25,25 @@ data Gene = Gene
     , id :: String
     }
 
+-- data Gene2 = Gene2
+--     {  source :: Int
+--     ,  sink :: Int
+--     ,  weight :: Number
+--     ,  activationFn :: Int
+--     ,  bias :: Number
+--     }
+
 instance showGene :: Show Gene where
-  show (Gene { id, weights, bias, disabled }) = "Gene " <> id <> " >>" 
-    <> "\nBias: " <> show bias
-    <> "\nDisabled: " <> show disabled
-    <> "\nWeights: " <> show weights
+  show (Gene { id, weights, bias, disabled }) = "\nGene " <> id <> " >>" 
+    <> "\n\tBias: " <> show bias
+    <> "\n\tDisabled: " <> show disabled
+    <> "\n\tWeights: " <> show weights
 
 
-type Genome = 
-    { layers :: Array Gene
-    , id :: String
-    } 
+type Genome = Array (Array Gene)
+--     { layers :: Array Gene
+--     , id :: String
+--     } 
 
 
 geneAlphabet :: String
@@ -40,6 +51,16 @@ geneAlphabet = "0123456789abcdefghijklmnopqrstuvwxyz-ABCDEFGHIJKLMNOPQRSTUVWXYZ.
 geneIdLength :: Int
 geneIdLength = 16
 
+
+
+
+genome :: Genome -> String
+genome g = fold ids
+    where ids = do
+            l <- g
+            (Gene { id }) <- l
+            pure $ id
+    
 
 
 gene :: Int -> Effect Gene
@@ -52,3 +73,10 @@ gene size = do
     disabled <- (>) 0.0 <$> generate
     id <- customAlphabet geneAlphabet geneIdLength
     pure $ Gene { weights, bias, activationFn: i, disabled, id }
+
+
+layer :: Int -> Effect (Array Gene)
+layer size = sequence $ A.replicate size (gene size)
+
+network :: Int -> Int -> Effect Genome
+network nLayers = sequence <<< A.replicate nLayers <<< layer 

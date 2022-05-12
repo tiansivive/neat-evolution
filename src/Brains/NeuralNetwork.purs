@@ -6,23 +6,23 @@ module Brains.NeuralNetwork
   , activationVector
   , biasVector
   , calculate
-  , makeNN
-  , testNN
+  , fromGenome
   , weightsMatrix
   )
   where
 
 import Prelude
 
-import ActivationFunction (ActivationFn(..))
-import Data.Array ((..))
+import ActivationFunction (ActivationFn(..), activationFunctions)
+import Brains.Genome (Gene(..), Genome)
 import Data.Array as A
-import Data.Array.NonEmpty as NEA
-import Data.Array.NonEmpty.Internal (NonEmptyArray(..))
+import Data.Array.NonEmpty (head, length, toArray) as NEA
+import Data.Array.NonEmpty.Internal (NonEmptyArray(..)) as NEA
 import Data.Matrix (Matrix(..), madd, mapply, multiply)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromJust)
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested (tuple3)
+import Partial.Unsafe (unsafePartial)
 
 
 newtype SumNum = Sum Number
@@ -52,11 +52,9 @@ instance showNeuron :: Show Neuron where
 
 
 data Network = NN 
-    { hidden :: Array (NEA.NonEmptyArray Neuron) 
-    , output :: Array Int
-    } 
+    { hidden :: Array (NEA.NonEmptyArray Neuron) } 
 instance showNN :: Show Network where
-  show (NN { hidden, output }) = "Network >>\nHidden:\n" <> show hidden <> "\nOutput:\n" <> show output
+  show (NN { hidden }) = "Network >>\nHidden:\n" <> show hidden 
 
 
 
@@ -92,24 +90,11 @@ calculate (NN { hidden }) input = Just v
         (Matrix _ _ v) = A.foldl step inputMatrix tuples
 
 
-makeNN :: Int -> Int -> Network
-makeNN size nLayers = NN 
-    { output: 0..(size -1)
-    , hidden: A.replicate nLayers layer
-    } 
-        where layer = NonEmptyArray $ A.replicate size $ Neuron { 
-            weights: A.replicate size 1.0
-            , activationFn: identity
-            , bias: 1.0
-            }
-
-testNN :: Network
-testNN = NN 
-    { output: 0..2
-    , hidden: A.replicate 5 
-        $ NonEmptyArray $ A.replicate 5 
-            $ Neuron { weights: A.replicate 5 0.0, bias: 0.0, activationFn: \n -> n } 
-            
-       
-}
+fromGenome :: Genome -> Network
+fromGenome g = NN { hidden }
+  where 
+    hidden = unsafePartial $ do
+      l <- g
+      let n = \(Gene { weights, bias, activationFn }) -> Neuron { weights, bias, activationFn: fromJust $ A.index activationFunctions activationFn }
+      [NEA.NonEmptyArray $ n <$> l]
 
