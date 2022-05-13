@@ -1,6 +1,7 @@
 module Brains.Genome
   ( Gene(..)
   , Genome
+  , GenomeID
   , gene
   , genome
   , network
@@ -41,6 +42,7 @@ instance showGene :: Show Gene where
 
 
 type Genome = Array (Array Gene)
+type GenomeID = String
 --     { layers :: Array Gene
 --     , id :: String
 --     } 
@@ -54,7 +56,7 @@ geneIdLength = 16
 
 
 
-genome :: Genome -> String
+genome :: Genome -> GenomeID
 genome g = fold ids
     where ids = do
             l <- g

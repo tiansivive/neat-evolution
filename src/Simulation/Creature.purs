@@ -1,6 +1,7 @@
 module Creature
   ( boundingBox
   , collided
+  , colorFromString
   , create
   , dispatch
   , draw
@@ -14,41 +15,60 @@ module Creature
 
 import Prelude
 
-import Color (rgb, toHexString)
+import Brains.Genome (Genome, genome)
+import Brains.NeuralNetwork (SumNum(..), fromGenome, run)
+import Color (Color, black, rgb, toHexString)
 import Control.Alt ((<|>))
 import Control.Monad.Cont.Trans (lift)
 import Control.Monad.Reader (ask)
 import Control.Monad.Rec.Class (Step(..), tailRecM)
-import Data.Array (delete, find)
+import Data.Array (delete, find, foldl, take, unsafeIndex)
+import Data.Char (toCharCode)
 import Data.Int (toNumber)
-import Data.Maths (Degrees)
-import Data.Maybe (Maybe(..), fromMaybe, maybe)
+import Data.Int.Bits (shl, shr, (.&.))
+import Data.Maths (Degrees, toRads)
+import Data.Maybe (fromMaybe)
+import Data.String (Pattern(..), length, split)
+import Data.String.Unsafe (char)
 import Data.Vector (Two, Vec(..), scale, vAdd, x, y, distance)
 import Data.Vector as V
+
 import Effect (Effect)
 import Effect.Random (randomInt, randomRange)
 import Effect.Ref as Ref
 import Geometry (BoundingBox, Position(..))
 import Graphics.Canvas (arc, beginPath, closePath, fillPath, lineTo, moveTo, setFillStyle, setStrokeStyle, stroke)
 import Habitat (checkOutOfBounds, hitEdge)
+import Math (cos, sin)
 import Math as Number
+import Partial.Unsafe (unsafePartial)
 import Simulation.Types (Action(..), App, Creature)
 
 
 
+-- | from https://gist.github.com/0x263b/2bdd90886c2036a1ad5bcf06d6e6fb37
+-- |
+colorFromString :: String -> Color
+colorFromString g 
+    | length g == 0 = black
+    | otherwise = rgb (generateColorComponent 0) (generateColorComponent 1) (generateColorComponent 2) 
+        where 
+            arr = split (Pattern "") g
+            code = toCharCode <<< char
+            -- | shift left 5 = multiply by 32 but restricting to a 32 bit number. .&. (AND) to ensure the 32 bits
+            _hash h c = let _h = c + (shl h 5 - h) in _h .&. _h 
+            hash = foldl _hash 0 $ code <$> arr
+            generateColorComponent i = shr hash (i * 8) .&. 255
 
-create :: App Creature
-create = do
+
+
+create :: Genome -> App Creature
+create g = do
     { state } <- ask
     { habitat } <- lift $ Ref.read state
     let 
         radiusE = map toNumber $ randomInt 5 10
         speedE = randomInt 1 2
-        colorE = do
-            r <- randomInt 0 255
-            g <- randomInt 0 255
-            b <- randomInt 0 255
-            pure $ rgb r g b 
         posE = do
             r <- radiusE
             x <- randomRange r $ (toNumber habitat.width - r)
@@ -64,11 +84,12 @@ create = do
     lift $ do
         radius <- radiusE
         speed <- speedE
-        color <- colorE
         pos <- posE
         orientation <- orientationE
+        let color = colorFromString $ genome g
+        let brain = fromGenome g
         let vision = { left: V.rotate (-30.0) orientation, right: V.rotate 30.0 orientation }
-        pure $ { color, radius, orientation, speed, pos, vision, debug: false, hover: false }
+        pure $ { color, radius, orientation, speed, pos, vision, brain, debug: false, hover: false }
 
        
 
@@ -154,8 +175,8 @@ randomRotate c = tailRecM go c
 
 dispatch :: Action -> Creature -> App Creature
 dispatch Move c = pure $ move c
-dispatch (HitEdge _) c = randomRotate c
-dispatch (Collided _) c = randomRotate c 
+dispatch (HitEdge _) c = pure c
+dispatch (Collided _) c = pure c 
 
    
 nextAction :: Creature -> App Action
@@ -170,13 +191,14 @@ nextAction c = do
 
       
 
-
-
-
 update :: Creature -> App Creature
-update c = do
+update c = unsafePartial $ do
     a <- nextAction c
-    dispatch a c
+    let input = [x c.pos, y c.pos, x c.orientation, y c.orientation, toNumber c.speed]
+    let out = take 1 $ fromMaybe (Sum <$> input) $ run c.brain input
+    let (Sum degrees) = unsafeIndex out 0 
+    let r = toRads degrees
+    dispatch a $ c { orientation = Vec [cos r, sin r] }
 
 
 intersects :: Position -> Creature -> Boolean

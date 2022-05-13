@@ -16,7 +16,7 @@ import Graphics.Canvas (getCanvasElementById, getContext2D)
 import Partial.Unsafe (unsafePartial)
 import Simulation (handleMouseEvents, loop)
 import Simulation.Closeup (step) as CloseUp
-import Simulation.Types (UiState(..))
+import Simulation.Types (SimState(..))
 import Simulation.UI (Signal(..), handleBtnClick)
 import Web.DOM.Document (toNonElementParentNode)
 import Web.DOM.Element (toEventTarget)
@@ -60,7 +60,8 @@ main = unsafePartial $ do
       , selected: []
       , closeUp: Nothing
       , habitat: { width, height }
-      , ui: Init { population: n, habitat: { width, height } }
+      , simulation: Init { population: n, habitat: { width, height } }
+      , brainSize: { layers: 2, neurons: 5 }
       }
 
     let env = { state, ctx, window: w, frameId: dummy}

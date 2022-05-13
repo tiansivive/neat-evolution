@@ -8,7 +8,7 @@ import Data.Maybe (fromJust)
 import Debug (spy)
 import Effect.Ref as Ref
 import Partial.Unsafe (unsafePartial)
-import Simulation.Types (App, UiState(..))
+import Simulation.Types (App, SimState(..))
 import Web.DOM.ParentNode (QuerySelector(..), querySelector)
 import Web.Event.EventTarget (EventListener, eventListener)
 import Web.HTML.HTMLDocument (toParentNode)
@@ -21,8 +21,8 @@ data Signal = Reset | Pause | Play
 
 handleBtnClick :: Signal -> App EventListener
 handleBtnClick msg = let
-    handler Play s _ _ = Ref.modify_ _ {  ui = Running } s
-    handler Pause s _ _ = Ref.modify_ _ {  ui = Paused } s
+    handler Play s _ _ = Ref.modify_ _ {  simulation = Playing } s
+    handler Pause s _ _ = Ref.modify_ _ {  simulation = Paused } s
     handler Reset s w _ = unsafePartial $ do
 
         doc <- document w
@@ -34,7 +34,7 @@ handleBtnClick msg = let
         height <- (fromJust <<< fromString) <$> (Input.value $ fromJust $ Input.fromElement hInput)
         n <- (fromJust <<< fromString) <$> (Input.value $ fromJust $ Input.fromElement cInput)
         
-        Ref.modify_ _ {  ui = Init { population: spy "New creatures:" n, habitat: spy "New habitat: " { width, height } } } s
+        Ref.modify_ _ {  simulation = Init { population: spy "New creatures:" n, habitat: spy "New habitat: " { width, height } } } s
       
     in do
         { state, window } <- ask

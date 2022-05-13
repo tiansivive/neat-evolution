@@ -1,14 +1,15 @@
 module Simulation
   ( coordinates
+  , handleCollisions
   , handleMouseEvents
   , loop
   , spawn
-  , time
   )
   where
 
 import Prelude
 
+import Brains.Genome (network)
 import Control.Monad.Reader (lift, runReaderT)
 import Control.Monad.Reader.Trans (ask)
 import Creature (collided)
@@ -25,7 +26,7 @@ import Effect.Ref as Ref
 import Effect.Timer (setTimeout)
 import Geometry (Position(..))
 import Habitat as Habitat
-import Simulation.Types (App, Creature, State, UiState(..))
+import Simulation.Types (App, Creature, SimState(..), State, BrainSize)
 import Web.DOM.Element (setAttribute)
 import Web.DOM.ParentNode (QuerySelector(..), querySelector)
 import Web.Event.Event (EventType(..))
@@ -83,20 +84,20 @@ handleMouseEvents =
     
 
 
-time :: App RequestAnimationFrameId
-time = do
-  traceM "Time update"
-  deps@{ state, window } <- ask
-  { creatures } <- lift $ Ref.read state
-  updated <- sequence $ map C.update creatures
-  _ <- lift $ Ref.modify _ { creatures = updated } state
+-- time :: App RequestAnimationFrameId
+-- time = do
+--   traceM "Time update"
+--   deps@{ state, window } <- ask
+--   { creatures } <- lift $ Ref.read state
+--   updated <- sequence $ map C.update creatures
+--   _ <- lift $ Ref.modify _ { creatures = updated } state
   
-  Habitat.draw
-  sequence_ $ map C.draw updated
+--   Habitat.draw
+--   sequence_ $ map C.draw updated
 
-  let next = void $ runReaderT time deps
-  let eff = setTimeout 250 next
-  lift $ requestAnimationFrame (void eff) window
+--   let next = void $ runReaderT time deps
+--   let eff = setTimeout 250 next
+--   lift $ requestAnimationFrame (void eff) window
 
 
         
@@ -105,15 +106,17 @@ step = do
   deps@{ state, window } <- ask
   { creatures } <- lift $ Ref.read state
   updated <- sequence $ map C.update creatures
-  next <- lift $ handleCollisions updated
-  _ <- lift $ Ref.modify _ { creatures = next } state
+  _ <- lift $ Ref.modify _ { creatures = updated } state
   Habitat.draw 
   sequence_ $ map C.draw updated
   lift $ requestAnimationFrame (runReaderT (void loop) deps) window
+  --lift $ requestAnimationFrame (pure unit) window
 
 
-spawn :: Int -> App (Array Creature)
-spawn n = sequence $ replicate n C.create 
+spawn :: BrainSize -> Int -> App (Array Creature)
+spawn { layers, neurons } n = do
+  genomes <- lift $ sequence $ replicate n $ network layers neurons
+  sequence $ C.create <$> genomes
 
 
 loop :: Partial => App RequestAnimationFrameId
@@ -125,17 +128,18 @@ loop =
       setAttribute "width" (show conf.habitat.width) canvas
       setAttribute "height" (show conf.habitat.height) canvas
   in do 
-    { state, window } <- ask
-    { ui } <- lift $ Ref.read state
-    case ui of
+    deps@{ state, window } <- ask
+    { simulation, brainSize } <- lift $ Ref.read state
+    case simulation of
       Paused -> lift $ requestAnimationFrame (pure unit) window
       Init conf -> do 
-        new <- spawn conf.population
+        new <- spawn brainSize conf.population
         lift $ updateCanvas window conf
-        lift $ Ref.modify_ _ { creatures = new, selected = [], closeUp = Nothing, habitat = conf.habitat, ui = Running } state
+        lift $ Ref.modify_ _ { creatures = new, selected = [], closeUp = Nothing, habitat = conf.habitat, simulation = Playing } state
         step
-      Running -> step
-      _ -> step
+      Playing -> step
+      _ -> lift $ requestAnimationFrame (runReaderT (void loop) deps) window
+
    
  
 

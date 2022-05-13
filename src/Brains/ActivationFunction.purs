@@ -1,7 +1,24 @@
-module ActivationFunction where
+module ActivationFunction
+  ( (^)
+  , ActivationFn(..)
+  , a
+  , activationFunctions
+  , binaryStep
+  , geLU
+  , l
+  , leakyReLU
+  , linear
+  , seLU
+  , sigmoid
+  , swish
+  , tanh
+  )
+  where
 
 import Prelude
 
+import Data.Number (isNaN)
+import Debug (spy)
 import Math (e, pi, pow, sqrt)
 
 
@@ -31,8 +48,11 @@ sigmoid :: Number -> Number
 sigmoid x = 1.0 / (1.0 + e^(-x))
 
 tanh :: Number -> Number
-tanh x = (e^x - e^(-x)) 
-                    / (e^x + e^(-x))
+tanh x = if isNaN y then 0.0 else y
+    where y = (e^x - e^(-x)) 
+            / (e^x + e^(-x))
+      
+          
 
 reLU :: Number -> Number
 reLU = max 0.0

@@ -2,13 +2,14 @@ module Simulation.Types where
 
 import Prelude
 
+import Brains.Genome (Genome, GenomeID)
+import Brains.NeuralNetwork (NeuralNetwork)
 import Color (Color)
 import Control.Monad.Reader (Reader, ReaderT, asks, runReader)
 import Data.Maybe (Maybe)
 import Data.Vector (Two, Vec)
 import Effect (Effect)
 import Effect.Ref (Ref)
-import Geometry (Position)
 import Graphics.Canvas (Context2D)
 import Web.HTML (Window)
 import Web.HTML.Window (RequestAnimationFrameId)
@@ -25,13 +26,15 @@ type Environment =
 
 -- TODO: Encode the relationship between closeUp and selected into the type signature, perhaps via some ADT
 type State =
-    { creatures     :: Array Creature
-    , selected      :: Array Creature
-    , closeUp       :: Maybe Creature
-    , habitat       :: HabitatConfig
-    , ui            :: UiState
+    { creatures         :: Array Creature
+    , selected          :: Array Creature
+    , closeUp           :: Maybe Creature
+    , habitat           :: HabitatConfig
+    , simulation        :: SimState
+    , brainSize         :: BrainSize
     }
 
+type BrainSize = { layers :: Int, neurons :: Int }
 
 type Creature = 
     { color :: Color
@@ -43,6 +46,7 @@ type Creature =
         , right :: Vec Two Number
         }
     , speed :: Int
+    , brain :: NeuralNetwork
     , debug :: Boolean
     , hover :: Boolean
     } 
@@ -52,10 +56,6 @@ type Edge =
     { vector :: Vec Two Number
     , point :: Vec Two Number 
     }
-
-
-data Action 
-    = HitEdge Edge | Collided Creature | Move 
 
 
 type HabitatConfig =  
@@ -68,9 +68,15 @@ type Config =
     , habitat       :: HabitatConfig
     }
 
-data UiState = Init Config | Running | Paused | Done
+
+data SimState = Init Config | Playing | Paused | Completed
+
+data Action 
+    = HitEdge Edge | Collided Creature | Move 
+
 
 type App = ReaderT Environment Effect
+
 
 fromReader :: forall m r a. Monad m => Reader r a -> ReaderT r m a
 fromReader = asks <<< runReader
