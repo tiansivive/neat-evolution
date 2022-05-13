@@ -8,6 +8,7 @@ import Data.Maybe (Maybe)
 import Data.Vector (Two, Vec)
 import Effect (Effect)
 import Effect.Ref (Ref)
+import Geometry (Position)
 import Graphics.Canvas (Context2D)
 import Web.HTML (Window)
 import Web.HTML.Window (RequestAnimationFrameId)
@@ -37,11 +38,24 @@ type Creature =
     , radius :: Number
     , pos :: Vec Two Number
     , orientation :: Vec Two Number
+    , vision ::
+        { left :: Vec Two Number
+        , right :: Vec Two Number
+        }
     , speed :: Int
     , debug :: Boolean
     , hover :: Boolean
     } 
-data Event = HitEdge | Move
+
+
+type Edge = 
+    { vector :: Vec Two Number
+    , point :: Vec Two Number 
+    }
+
+
+data Action 
+    = HitEdge Edge | Collided Creature | Move 
 
 
 type HabitatConfig =  
