@@ -89,7 +89,7 @@ create g = do
         let color = colorFromString $ genome g
         let brain = fromGenome g
         let vision = { left: V.rotate (-30.0) orientation, right: V.rotate 30.0 orientation }
-        pure $ { color, radius, orientation, speed, pos, vision, brain, debug: false, hover: false }
+        pure $ { color, radius, orientation, speed, pos, vision, brain, genome: g, debug: false, hover: false }
 
        
 

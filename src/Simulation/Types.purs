@@ -32,6 +32,7 @@ type State =
     , habitat           :: HabitatConfig
     , simulation        :: SimState
     , brainSize         :: BrainSize
+    , mutationRate      :: Number
     }
 
 type BrainSize = { layers :: Int, neurons :: Int }
@@ -47,6 +48,7 @@ type Creature =
         }
     , speed :: Int
     , brain :: NeuralNetwork
+    , genome :: Genome
     , debug :: Boolean
     , hover :: Boolean
     } 

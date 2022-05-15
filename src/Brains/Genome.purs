@@ -3,6 +3,8 @@ module Brains.Genome
   , Genome
   , GenomeID
   , gene
+  , geneAlphabet
+  , geneIdLength
   , genome
   , network
   )
@@ -34,6 +36,9 @@ data Gene = Gene
 --     ,  bias :: Number
 --     }
 
+instance eqGene :: Eq Gene where
+  eq (Gene g1) (Gene g2) = g1.id == g2.id
+  
 instance showGene :: Show Gene where
   show (Gene { id, weights, bias, disabled }) = "\nGene " <> id <> " >>" 
     <> "\n\tBias: " <> show bias
