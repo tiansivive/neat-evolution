@@ -16,6 +16,7 @@ import ActivationFunction (activationFunctions)
 import Data.Array (fold)
 import Data.Array as A
 import Data.Traversable (sequence)
+import Data.Utils.Array (randomIndex)
 import Effect (Effect)
 import Effect.Random (randomInt, randomRange)
 import FFI.NanoID (customAlphabet)
@@ -54,9 +55,11 @@ type GenomeID = String
 
 
 geneAlphabet :: String
-geneAlphabet = "0123456789abcdefghijklmnopqrstuvwxyz-ABCDEFGHIJKLMNOPQRSTUVWXYZ."
+--geneAlphabet = "0123456789abcdefghijklmnopqrstuvwxyz-ABCDEFGHIJKLMNOPQRSTUVWXYZ."
+geneAlphabet = "0123456789abcdef"
 geneIdLength :: Int
-geneIdLength = 16
+--geneIdLength = 16
+geneIdLength = 6
 
 
 
@@ -66,7 +69,7 @@ genome g = fold ids
     where ids = do
             l <- g
             (Gene { id }) <- l
-            pure $ id
+            pure $ (id <> " ")
     
 
 
@@ -76,7 +79,7 @@ gene size = do
     let generate = randomRange 0.0 1.0
     weights <- sequence $ A.replicate l generate <> A.replicate (size - l) (pure 0.0)
     bias <- generate
-    i <- randomInt 0 (A.length activationFunctions - 1)
+    i <- randomIndex activationFunctions
     disabled <- (>) 0.0 <$> generate
     id <- customAlphabet geneAlphabet geneIdLength
     pure $ Gene { weights, bias, activationFn: i, disabled, id }

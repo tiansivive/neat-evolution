@@ -61,8 +61,8 @@ main = unsafePartial $ do
       , closeUp: Nothing
       , habitat: { width, height }
       , simulation: Init { population: n, habitat: { width, height } }
-      , brainSize: { layers: 2, neurons: 5 }
-      , mutationRate: 0.25
+      , brainSize: { layers: 1, neurons: 2 }
+      , mutationRate: 0.1
       }
 
     let env = { state, ctx, window: w, frameId: dummy}

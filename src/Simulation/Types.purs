@@ -2,7 +2,7 @@ module Simulation.Types where
 
 import Prelude
 
-import Brains.Genome (Genome, GenomeID)
+import Brains.Genome (Genome)
 import Brains.NeuralNetwork (NeuralNetwork)
 import Color (Color)
 import Control.Monad.Reader (Reader, ReaderT, asks, runReader)

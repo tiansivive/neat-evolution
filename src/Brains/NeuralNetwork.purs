@@ -61,6 +61,9 @@ instance showNN :: Show NeuralNetwork where
 instance eqNN :: Eq NeuralNetwork where
   eq (NN { id: id1 }) (NN { id: id2 }) = id1 == id2
 
+instance ordNN :: Ord NeuralNetwork where
+  compare (NN { id: id1 }) (NN { id: id2 }) = compare id1 id2
+
 
 weightsMatrix :: NEA.NonEmptyArray Neuron -> Matrix SumNum
 weightsMatrix layer = Matrix rows cols $ A.concat $ NEA.toArray weightsVectors

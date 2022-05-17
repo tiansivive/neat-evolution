@@ -15,23 +15,26 @@ module Creature
 
 import Prelude
 
-import Brains.Genome (Genome, genome)
+import Brains.Genome (Gene(..), Genome, genome)
 import Brains.NeuralNetwork (SumNum(..), fromGenome, run)
-import Color (Color, black, rgb, toHexString)
+import Color (Color, ColorSpace(..), black, fromHexString, mix, rgb, toHexString)
 import Control.Alt ((<|>))
 import Control.Monad.Cont.Trans (lift)
 import Control.Monad.Reader (ask)
 import Control.Monad.Rec.Class (Step(..), tailRecM)
-import Data.Array (delete, find, foldl, take, unsafeIndex)
+import Data.Array (concat, delete, find, foldl, take, unsafeIndex)
 import Data.Char (toCharCode)
-import Data.Int (floor, fromNumber, toNumber)
+import Data.Foldable (fold)
+import Data.Int (floor, toNumber)
 import Data.Int.Bits (shl, shr, (.&.))
 import Data.Maths (Degrees, toRads)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, maybe)
 import Data.String (Pattern(..), length, split)
 import Data.String.Unsafe (char)
+import Data.Traversable (traverse)
 import Data.Vector (Two, Vec(..), scale, vAdd, x, y, distance)
 import Data.Vector as V
+import Debug as Debug
 import Effect (Effect)
 import Effect.Random (randomInt, randomRange)
 import Effect.Ref as Ref
@@ -79,15 +82,20 @@ create g = do
             x <- randomRange 0.0 1.0
             let y = 1.0 - x 
             pure $ Vec [x, y]
+        
+        genomeColors = traverse (traverse \(Gene { id }) -> fromHexString ("#" <> id)) g
+        blend = concat >>> (foldl (\a c -> mix RGB a c 0.5) black)
 
     lift $ do
         radius <- radiusE
         speed <- speedE
         pos <- posE
         orientation <- orientationE
-        let color = colorFromString $ genome g
+
+        let color = maybe black blend genomeColors
         let brain = fromGenome g
         let vision = { left: V.rotate (-30.0) orientation, right: V.rotate 30.0 orientation }
+
         pure $ { color, radius, orientation, speed, pos, vision, brain, genome: g, debug: false, hover: false }
 
        
@@ -193,12 +201,18 @@ nextAction c = do
 update :: Creature -> App Creature
 update c = unsafePartial $ do
     a <- nextAction c
-    let input = [x c.pos, y c.pos, x c.orientation, y c.orientation, toNumber c.speed]
+    --let input = [x c.pos, y c.pos, x c.orientation, y c.orientation, toNumber c.speed]
+    let input = [x c.orientation, y c.orientation]
     let out = take 2 $ fromMaybe (Sum <$> input) $ run c.brain input
     let (Sum degrees) = unsafeIndex out 0 
     let (Sum speed) = unsafeIndex out 1 
     let r = toRads degrees
-    dispatch a $ c { orientation = Vec [cos r, sin r], speed = min (floor speed) 4 }
+    let o =  Vec [cos r, sin r]
+    dispatch a $ c { 
+        orientation = o, 
+        vision = { left: V.rotate (-30.0) o, right: V.rotate 30.0 o  },
+        speed = min (floor speed) 4
+    }
 
 
 intersects :: Position -> Creature -> Boolean

@@ -15,14 +15,17 @@ module Brains.NEAT
 import Prelude
 
 import ActivationFunction (activationFunctions)
-import Brains.Genome (Gene(..), Genome, geneAlphabet, geneIdLength)
+import Brains.Genome (Gene(..), Genome, geneAlphabet, geneIdLength, genome)
+import Brains.NeuralNetwork (NeuralNetwork(..))
+import Color (toHexString)
 import Control.Monad.Reader (ask)
 import Control.Monad.Trans.Class (lift)
 import Creature (create)
-import Data.Array (filter, length, sortWith, splitAt, take, unsafeIndex, updateAt, zipWith)
+import Data.Array (filter, groupAllBy, length, sortWith, splitAt, take, unsafeIndex, updateAt, zipWith, zipWithA)
+import Data.Array.NonEmpty as NEA
 import Data.Int (floor, toNumber)
 import Data.Maybe (fromJust)
-import Data.Traversable (sequence, traverse)
+import Data.Traversable (for, sequence, traverse)
 import Data.Tuple (Tuple(..))
 import Data.Utils.Array (randomPairs, randomlyTake)
 import Debug as Debug
@@ -88,9 +91,9 @@ mutate g = unsafePartial $ do
 
 
 crossover :: Tuple Genome Genome -> Effect Genome
-crossover (Tuple mom dad) = sequence $ zipWith mergeLayers mom dad
+crossover (Tuple mom dad) = zipWithA mergeLayers mom dad
     where 
-        mergeLayers l1 l2 = sequence $ zipWith randompick l1 l2
+        mergeLayers = zipWithA randompick
         randompick g1 g2 = do
             r <- random
             pure $ if r >= 0.5 then g1 else g2
@@ -99,9 +102,8 @@ crossover (Tuple mom dad) = sequence $ zipWith mergeLayers mom dad
 produceOffspring :: Array Genome -> Effect (Array Genome)
 produceOffspring gs = do 
     couples <- randomPairs gs
-    firstChildren <- traverse crossover couples
-    secondChildren <- traverse crossover couples
-    pure $ firstChildren <> secondChildren
+    children <- traverse crossover couples
+    pure children
 
 
 
@@ -121,11 +123,27 @@ evolve fn cutoff = do
 
     let diff = length creatures - length genomes - length elites
     fillers <- lift $ randomlyTake diff genomes
+    
+    -- Debug.traceM $ "Current gen num: " <> (show $ length creatures)
+    -- Debug.traceM $ "Fit num: " <> (show $ length fit)
+    -- Debug.traceM $ "Elites num: " <> (show $ length elites)
+    -- Debug.traceM $ "Breeding num: " <> (show $ length breeding)
+    -- Debug.traceM $ "Diff: " <> (show diff)
+    -- Debug.traceM $ "Fillers num: " <> (show $ length fillers)
+
 
     offspring <- lift $ produceOffspring (genomes <> fillers)
     mutated <- traverse mutate offspring
     newGeneration <- traverse create mutated
-    
-    Debug.traceM $ "New gen length: " <> (show $ length newGeneration)
-    pure $ take (length creatures) $ elites <> newGeneration
+    let all =  elites <> newGeneration
+
+    -- _ <- for all \c -> Debug.traceM $ "Creature genomeID: " <> genome c.genome <> "\nColor: " <> toHexString c.color
+
+    Debug.traceM "\nEvolving!"
+    let groups = groupAllBy (\c1 c2 -> compare c1.brain c2.brain) all
+    _ <- for groups \g -> 
+        let (NN { id }) = (NEA.head g).brain in 
+            Debug.traceM $ "For genome: " <> id <> ": group size -> " <> (show $ NEA.length g)
+
+    pure $ take (length creatures) all
 
