@@ -24,7 +24,7 @@ import Control.Monad.Reader (ask)
 import Control.Monad.Rec.Class (Step(..), tailRecM)
 import Data.Array (delete, find, foldl, take, unsafeIndex)
 import Data.Char (toCharCode)
-import Data.Int (toNumber)
+import Data.Int (floor, fromNumber, toNumber)
 import Data.Int.Bits (shl, shr, (.&.))
 import Data.Maths (Degrees, toRads)
 import Data.Maybe (fromMaybe)
@@ -32,7 +32,6 @@ import Data.String (Pattern(..), length, split)
 import Data.String.Unsafe (char)
 import Data.Vector (Two, Vec(..), scale, vAdd, x, y, distance)
 import Data.Vector as V
-
 import Effect (Effect)
 import Effect.Random (randomInt, randomRange)
 import Effect.Ref as Ref
@@ -176,7 +175,7 @@ randomRotate c = tailRecM go c
 dispatch :: Action -> Creature -> App Creature
 dispatch Move c = pure $ move c
 dispatch (HitEdge _) c = pure c
-dispatch (Collided _) c = pure c 
+dispatch (Collided _) c = pure $ move c 
 
    
 nextAction :: Creature -> App Action
@@ -195,10 +194,11 @@ update :: Creature -> App Creature
 update c = unsafePartial $ do
     a <- nextAction c
     let input = [x c.pos, y c.pos, x c.orientation, y c.orientation, toNumber c.speed]
-    let out = take 1 $ fromMaybe (Sum <$> input) $ run c.brain input
+    let out = take 2 $ fromMaybe (Sum <$> input) $ run c.brain input
     let (Sum degrees) = unsafeIndex out 0 
+    let (Sum speed) = unsafeIndex out 1 
     let r = toRads degrees
-    dispatch a $ c { orientation = Vec [cos r, sin r] }
+    dispatch a $ c { orientation = Vec [cos r, sin r], speed = min (floor speed) 4 }
 
 
 intersects :: Position -> Creature -> Boolean

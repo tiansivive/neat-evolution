@@ -3,6 +3,7 @@ module Simulation
   , handleCollisions
   , handleMouseEvents
   , loop
+  , sort
   , spawn
   )
   where
@@ -10,6 +11,7 @@ module Simulation
 import Prelude
 
 import Brains.Genome (network)
+import Brains.NEAT (evolve)
 import Control.Monad.Reader (lift, runReaderT)
 import Control.Monad.Reader.Trans (ask)
 import Creature (collided)
@@ -17,8 +19,9 @@ import Creature (create, draw, intersects, rotate, update) as C
 import Data.Array (delete, filter, find, index, replicate)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..), fromJust)
-import Data.Traversable (sequence, sequence_)
-import Debug (spy, traceM)
+import Data.Traversable (sequence, traverse, traverse_)
+import Data.Vector (x)
+import Debug (spy)
 import Effect (Effect)
 import Effect.Console (error)
 import Effect.Random (randomRange)
@@ -26,7 +29,7 @@ import Effect.Ref as Ref
 import Effect.Timer (setTimeout)
 import Geometry (Position(..))
 import Habitat as Habitat
-import Simulation.Types (App, Creature, SimState(..), State, BrainSize)
+import Simulation.Types (App, BrainSize, Creature, SimState(..), State, HabitatConfig)
 import Web.DOM.Element (setAttribute)
 import Web.DOM.ParentNode (QuerySelector(..), querySelector)
 import Web.Event.Event (EventType(..))
@@ -105,10 +108,10 @@ step:: Partial => App RequestAnimationFrameId
 step = do
   deps@{ state, window } <- ask
   { creatures } <- lift $ Ref.read state
-  updated <- sequence $ map C.update creatures
+  updated <- traverse C.update creatures
   _ <- lift $ Ref.modify _ { creatures = updated } state
   Habitat.draw 
-  sequence_ $ map C.draw updated
+  traverse_ C.draw updated
   lift $ requestAnimationFrame (runReaderT (void loop) deps) window
   --lift $ requestAnimationFrame (pure unit) window
 
@@ -116,7 +119,7 @@ step = do
 spawn :: BrainSize -> Int -> App (Array Creature)
 spawn { layers, neurons } n = do
   genomes <- lift $ sequence $ replicate n $ network layers neurons
-  sequence $ C.create <$> genomes
+  traverse C.create genomes
 
 
 loop :: Partial => App RequestAnimationFrameId
@@ -128,18 +131,25 @@ loop =
       setAttribute "width" (show conf.habitat.width) canvas
       setAttribute "height" (show conf.habitat.height) canvas
   in do 
-    deps@{ state, window } <- ask
-    { simulation, brainSize } <- lift $ Ref.read state
+    { state, window } <- ask
+    { simulation, brainSize, habitat } <- lift $ Ref.read state
     case simulation of
       Paused -> lift $ requestAnimationFrame (pure unit) window
       Init conf -> do 
         new <- spawn brainSize conf.population
         lift $ updateCanvas window conf
         lift $ Ref.modify_ _ { creatures = new, selected = [], closeUp = Nothing, habitat = conf.habitat, simulation = Playing } state
+
+        _ <- lift $ setTimeout 5000 (Ref.modify_ _ { simulation = Completed } state)
+
         step
       Playing -> step
-      _ -> lift $ requestAnimationFrame (runReaderT (void loop) deps) window
-
+      Completed -> do 
+        nextGen <- evolve (fitness habitat) (cutoff habitat)
+        _ <- lift $ Ref.modify_ _ { creatures = nextGen, simulation = Completed } state
+        _ <- lift $ setTimeout 5000 (Ref.modify_ _ { simulation = Completed } state)
+        _ <- lift $ Ref.modify_ _ { simulation = Playing } state
+        step
    
  
 
@@ -152,5 +162,28 @@ handleCollisions creatures =
         Just _ -> do
           angle <- randomRange 0.0 360.0
           pure $ C.rotate angle h
-  in sequence $ applyCollisionStrategy <$> creatures 
+  in traverse applyCollisionStrategy creatures 
 
+
+fitness :: HabitatConfig -> Creature -> Number
+fitness habitat c = min p (toNumber habitat.width - p)
+  where p = x c.pos
+   
+
+cutoff :: HabitatConfig -> Creature -> Boolean
+cutoff habitat c 
+  | x c.pos > (toNumber habitat.width * 0.8) = true
+  | x c.pos < (toNumber habitat.width * 0.2) = true
+  | otherwise = false
+
+
+sort :: HabitatConfig -> Creature -> Creature -> Ordering
+sort habitat c1 c2 = order
+  where
+    edgeProximity c = toNumber habitat.width - x c.pos
+    order 
+      | edgeProximity c1 < edgeProximity c2 = GT
+      | edgeProximity c1 > edgeProximity c2 = LT
+      | otherwise = EQ
+  
+  

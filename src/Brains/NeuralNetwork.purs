@@ -22,8 +22,6 @@ import Data.Matrix (Matrix(..), madd, mapply, multiply)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested (tuple3)
-import Debug (spy)
-import Math (e)
 import Partial.Unsafe (unsafePartial)
 
 
