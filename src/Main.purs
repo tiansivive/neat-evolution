@@ -9,9 +9,11 @@ import Prelude
 import App.App (AppState(..))
 import Control.Monad.RWS (RWSResult(..), RWST(..), runRWST)
 import Control.Monad.Reader (runReaderT)
+import Data.Foldable (fold, traverse_)
 import Data.Int (fromString)
 import Data.Map (empty)
 import Data.Maybe (Maybe(..), fromJust)
+import Debug as Debug
 import Effect (Effect)
 import Effect.Console (log)
 import Effect.Ref as Ref
@@ -32,7 +34,6 @@ import Web.HTML.HTMLDocument (toDocument, toParentNode)
 import Web.HTML.HTMLInputElement (fromElement, value) as Input
 import Web.HTML.Window (document, requestAnimationFrame)
 import Web.UIEvent.MouseEvent.EventTypes (mousemove)
-
 
 
 main :: Effect Unit
@@ -59,9 +60,9 @@ main = unsafePartial $ do
 
     dummy <- requestAnimationFrame (pure unit) w
 
-    let simConfig = { population: n
+    let simConfig = { population: 100
                     , totalGens: 100
-                    , ttlGen: 60
+                    , ttlGen: 1
                     , mutationRate: 0.1
                     , brainSize: { layers: 1, neurons: 2 }
                     , habitat: { width, height }
@@ -74,13 +75,18 @@ main = unsafePartial $ do
       }
 
     let env = { state, ctx, window: w, frameId: dummy}
-    let target = toEventTarget mainCanvasEl 
+    -- let target = toEventTarget mainCanvasEl 
     
     -- handler <- runReaderT handleMouseEvents env
     -- addEventListener click handler true target
     -- addEventListener mousemove handler true target
     
-    let eff = getContext2D closeUpCanvas >>= \closeUpCtx -> runReaderT CloseUp.step { ctx: closeUpCtx, window: w, creature: Nothing } >>= \_ -> runRWST simStep ( merge { ctx, window: w } simConfig ) { step: 0, currentGen: 0, state: Simulating, creatures: [], genomes: empty }
+    let eff = getContext2D closeUpCanvas >>= 
+              \closeUpCtx -> runReaderT CloseUp.step { ctx: closeUpCtx, window: w, creature: Nothing } >>= 
+              \_ -> runRWST simStep ( merge { ctx, window: w } simConfig ) { step: 0, currentGen: 0, state: Start, creatures: [], genomes: empty } 
+                -- >>=
+                --   \(RWSResult st _ writer) -> Debug.traceM st >>= 
+                --   \_ -> traverse_ Debug.traceM writer
     
     void $ requestAnimationFrame (void eff) w
     

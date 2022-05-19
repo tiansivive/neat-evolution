@@ -33,9 +33,11 @@ import Data.Map (Map, empty)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (sequence, traverse, traverse_)
 import Data.Vector (x)
+import Debug as Debug
 import Effect (Effect)
 import Effect.Random (randomRange)
 import Habitat (Habitat, draw) as H
+import Type.Function (type ($))
 import Type.Row (type (+))
 import Web.HTML.Window (requestAnimationFrame)
 
@@ -60,6 +62,7 @@ data Animation = Running | Paused
 
 data SimState
     = Idle 
+    | Start
     | Animation Animation
     | Simulating
     | Evolving
@@ -68,7 +71,7 @@ data SimState
 
 type Log = List Selection 
 type Step = Generation ( step :: Int, currentGen :: Int, state :: SimState )
-type Simulation = RWST (Record (Config + DrawDependencies ())) Log Step Effect
+type Simulation = RWST (Record $ Config + DrawDependencies ()) Log Step Effect
 
 
 
@@ -93,22 +96,34 @@ simStep = do
           tell $ singleton { elites: [], creatures, genomes: empty, scores: empty }
           modify_ _ { state = Evolving, step = 0 }
         else do 
+          --Debug.traceM $ "Simulating step: " <> show step <> " for gen " <> show currentGen
+        
           let actions = creatures <#> C.nextAction habitat creatures
           modify_ _ { step = step + 1, creatures = zipWith C.update actions creatures }
+          
 
       switch = case state of
+        Start -> do
+          Debug.traceM "Starting Sim:"
+          initialPopulation <- spawn
+          modify_ _ { currentGen = 0, step = 0, creatures = initialPopulation, state = Simulating }
+          simStep
         Evolving -> do
+          Debug.traceM $ "Evolving gen: " <> show currentGen
           nextGen <- evolve
           modify_ _ { currentGen = currentGen + 1, creatures = nextGen, state = Simulating }
+          simStep
 
-        Simulating -> next 
-        Animation Paused -> pure unit
+        Simulating -> do
+          next
+          simStep 
+        Animation Paused -> simStep
         Animation Running -> do
           lift $ render draw { creatures, habitat, ctx, window }
           _ <- lift $ requestAnimationFrame (void $ runRWST next deps st) window
           pure unit
 
-        _ -> pure unit
+        _ -> simStep
 
 
     if currentGen /= totalGens 
@@ -117,47 +132,18 @@ simStep = do
       
 
 
+run :: Partial => Record $  Config + DrawDependencies () -> Step -> Effect Unit
+run conf st = do
+  _ <- runRWST simStep conf st
+  pure unit
 
-spawn :: NEAT.BrainSize -> Int -> Simulation (Array Creature)
-spawn { layers, neurons } n = do
-  { habitat } <- ask
-  genomes <- lift $ sequence $ replicate n $ network layers neurons
+
+
+spawn :: Simulation (Array Creature)
+spawn = do
+  { habitat, brainSize, population } <- ask
+  genomes <- lift $ sequence $ replicate population $ network brainSize.layers brainSize.neurons
   lift $ traverse (C.create habitat) genomes
-
-
--- loop :: Partial => Graphics (simulation :: Simulation Unit) RequestAnimationFrameId
--- loop = ?loop
-  -- let
-  --   updateCanvas w conf = do
-  --     doc <- document w
-  --     canvas <- fromJust <$> querySelector (QuerySelector "#board") (toParentNode doc)
-  --     setAttribute "width" (show conf.habitat.width) canvas
-  --     setAttribute "height" (show conf.habitat.height) canvas
-  -- in do 
-  --   { window, brainSize, habitat } <- ask
-  --   { state, currentGen } <- get
-  --   case state of
-  --     -- Paused -> lift $ requestAnimationFrame (pure unit) window
-  --     Idle conf -> do 
-  --       new <- spawn brainSize conf.population
-  --       lift $ updateCanvas window conf
-  --       -- lift $ Ref.modify_ _ { creatures = new, selected = [], closeUp = Nothing, habitat = conf.habitat, simulation = Playing } state
-
-  --       _ <- lift $ setTimeout 5000 (Ref.modify_ _ { simulation = Completed } state)
-
-  --       step
-  --     Playing -> step
-  --     Completed -> do 
-  --       nextGen <- evolve (fitness habitat) (cutoff habitat)
-  --       _ <- lift $ Ref.modify_ _ { creatures = nextGen, simulation = Completed } state
-  --       _ <- lift $ setTimeout 5000 (Ref.modify_ _ { simulation = Completed } state)
-  --       _ <- lift $ Ref.modify_ _ { simulation = Playing } state
-  --       step
-  --     Idle -> lift $ requestAnimationFrame (pure unit) window 
-   
-
-
-
 
  
 

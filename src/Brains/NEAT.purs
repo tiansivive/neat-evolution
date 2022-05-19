@@ -21,7 +21,7 @@ import Brains.NeuralNetwork (NeuralNetwork(..))
 import Control.Monad.Reader (ReaderT, ask)
 import Control.Monad.Trans.Class (lift)
 import Creature (Creature, create)
-import Data.Array (filter, groupAllBy, length, sortWith, splitAt, take, unsafeIndex, updateAt, zipWithA)
+import Data.Array (filter, groupAllBy, length, null, sortWith, splitAt, take, unsafeIndex, updateAt, zipWithA)
 import Data.Array.NonEmpty as NEA
 import Data.Int (floor, toNumber)
 import Data.Maybe (fromJust)
@@ -133,7 +133,10 @@ evolve fn cutoff creatures = do
 
         diff = length creatures - length fit
 
-    fillers <- lift $ randomlyTake diff breeding
+
+
+    fillers <- lift $ randomlyTake diff (if null breeding then _.genome <$> creatures else breeding)
+    
     
     -- Debug.traceM $ "Current gen num: " <> (show $ length creatures)
     -- Debug.traceM $ "Fit num: " <> (show $ length fit)
@@ -146,11 +149,11 @@ evolve fn cutoff creatures = do
     mutated <- traverse mutate offspring
     newGeneration <- lift $ traverse (create habitat) (mutated <> elites)
 
-    Debug.traceM "\nEvolving!"
-    let groups = groupAllBy (\c1 c2 -> compare c1.brain c2.brain) newGeneration
-    _ <- for groups \g -> 
-        let (NN { id }) = (NEA.head g).brain in 
-            Debug.traceM $ "For genome: " <> id <> ": group size -> " <> (show $ NEA.length g)
+    --Debug.traceM "\nEvolving!"
+    -- let groups = groupAllBy (\c1 c2 -> compare c1.brain c2.brain) newGeneration
+    -- _ <- for groups \g -> 
+    --     let (NN { id }) = (NEA.head g).brain in 
+    --         Debug.traceM $ "For genome: " <> id <> ": group size -> " <> (show $ NEA.length g)
 
     
     pure $ take (length creatures) newGeneration
