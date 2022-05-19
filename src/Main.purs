@@ -6,17 +6,20 @@ module Main
 
 import Prelude
 
+import App.App (AppState(..))
+import Control.Monad.RWS (RWSResult(..), RWST(..), runRWST)
 import Control.Monad.Reader (runReaderT)
 import Data.Int (fromString)
+import Data.Map (empty)
 import Data.Maybe (Maybe(..), fromJust)
 import Effect (Effect)
 import Effect.Console (log)
 import Effect.Ref as Ref
 import Graphics.Canvas (getCanvasElementById, getContext2D)
 import Partial.Unsafe (unsafePartial)
-import Simulation (handleMouseEvents, loop)
+import Record (merge)
+import Simulation (SimState(..), simStep)
 import Simulation.Closeup (step) as CloseUp
-import Simulation.Types (SimState(..))
 import Simulation.UI (Signal(..), handleBtnClick)
 import Web.DOM.Document (toNonElementParentNode)
 import Web.DOM.Element (toEventTarget)
@@ -55,24 +58,29 @@ main = unsafePartial $ do
     n <- (fromJust <<< fromString) <$> (Input.value $ fromJust $ Input.fromElement cInput)
 
     dummy <- requestAnimationFrame (pure unit) w
+
+    let simConfig = { population: n
+                    , totalGens: 100
+                    , ttlGen: 60
+                    , mutationRate: 0.1
+                    , brainSize: { layers: 1, neurons: 2 }
+                    , habitat: { width, height }
+                    }
+
     state <- Ref.new 
-      { creatures: []
-      , selected: []
-      , closeUp: Nothing
-      , habitat: { width, height }
-      , simulation: Init { population: n, habitat: { width, height } }
-      , brainSize: { layers: 1, neurons: 2 }
-      , mutationRate: 0.1
+      { simulation: simStep
+      , appState: Configuring simConfig
+      , inspector: { creature: Nothing }
       }
 
     let env = { state, ctx, window: w, frameId: dummy}
     let target = toEventTarget mainCanvasEl 
     
-    handler <- runReaderT handleMouseEvents env
-    addEventListener click handler true target
-    addEventListener mousemove handler true target
+    -- handler <- runReaderT handleMouseEvents env
+    -- addEventListener click handler true target
+    -- addEventListener mousemove handler true target
     
-    let eff = getContext2D closeUpCanvas >>= \closeUpCtx -> runReaderT CloseUp.step env { ctx = closeUpCtx } >>= \_ ->  runReaderT loop env 
+    let eff = getContext2D closeUpCanvas >>= \closeUpCtx -> runReaderT CloseUp.step { ctx: closeUpCtx, window: w, creature: Nothing } >>= \_ -> runRWST simStep ( merge { ctx, window: w } simConfig ) { step: 0, currentGen: 0, state: Simulating, creatures: [], genomes: empty }
     
     void $ requestAnimationFrame (void eff) w
     

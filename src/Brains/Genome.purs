@@ -13,9 +13,8 @@ module Brains.Genome
 import Prelude
 
 import ActivationFunction (activationFunctions)
-import Data.Array (fold)
 import Data.Array as A
-import Data.Traversable (sequence)
+import Data.Traversable (intercalate, sequence)
 import Data.Utils.Array (randomIndex)
 import Effect (Effect)
 import Effect.Random (randomInt, randomRange)
@@ -65,11 +64,12 @@ geneIdLength = 6
 
 
 genome :: Genome -> GenomeID
-genome g = fold ids
-    where ids = do
-            l <- g
-            (Gene { id }) <- l
-            pure $ (id <> " ")
+genome g = intercalate " " ids 
+  where 
+    ids = do
+      l <- g
+      (Gene { id }) <- l
+      pure id
     
 
 

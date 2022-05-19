@@ -1,5 +1,7 @@
 module Brains.NEAT
-  ( Fit(..)
+  ( BrainSize
+  , Config
+  , Fit(..)
   , Mutation(..)
   , Population
   , Score
@@ -8,33 +10,31 @@ module Brains.NEAT
   , fromNum
   , modify
   , mutate
-  
   )
   where
 
 import Prelude
 
 import ActivationFunction (activationFunctions)
-import Brains.Genome (Gene(..), Genome, geneAlphabet, geneIdLength, genome)
+import Brains.Genome (Gene(..), Genome, geneAlphabet, geneIdLength)
 import Brains.NeuralNetwork (NeuralNetwork(..))
-import Color (toHexString)
-import Control.Monad.Reader (ask)
+import Control.Monad.Reader (ReaderT, ask)
 import Control.Monad.Trans.Class (lift)
-import Creature (create)
-import Data.Array (filter, groupAllBy, length, sortWith, splitAt, take, unsafeIndex, updateAt, zipWith, zipWithA)
+import Creature (Creature, create)
+import Data.Array (filter, groupAllBy, length, sortWith, splitAt, take, unsafeIndex, updateAt, zipWithA)
 import Data.Array.NonEmpty as NEA
 import Data.Int (floor, toNumber)
 import Data.Maybe (fromJust)
-import Data.Traversable (for, sequence, traverse)
+import Data.Traversable (for, traverse)
 import Data.Tuple (Tuple(..))
 import Data.Utils.Array (randomPairs, randomlyTake)
 import Debug as Debug
 import Effect (Effect)
 import Effect.Random (random, randomInt)
-import Effect.Ref as Ref
 import FFI.NanoID (customAlphabet)
+import Habitat (Habitat)
 import Partial.Unsafe (unsafePartial)
-import Simulation.Types (Creature, App)
+
 
 type Population a = Array a
 data Mutation = Weight | Bias | Activation
@@ -47,6 +47,18 @@ type Score = Number
 
 type FitnessFn a = a -> Score
 type CutoffFn a = a -> Boolean
+
+type BrainSize = { layers :: Int, neurons :: Int }
+
+
+type Config r = 
+    ( mutationRate  :: Number
+    , brainSize     :: BrainSize
+    , habitat       :: Habitat
+    | r
+    )
+
+type Evolution r = ReaderT (Record (Config r)) Effect
 
 fromNum :: Number -> Mutation
 fromNum n
@@ -70,10 +82,9 @@ modify Activation (Gene n) = do
 
 
 
-mutate :: Genome -> App Genome
+mutate :: forall r. Genome -> Evolution r Genome
 mutate g = unsafePartial $ do
-    { state } <- ask
-    { mutationRate, brainSize } <- lift $ Ref.read state
+    { mutationRate, brainSize } <- ask
     r <- lift random
     if r < mutationRate 
         then do
@@ -108,21 +119,21 @@ produceOffspring gs = do
 
 
 
-evolve :: FitnessFn Creature -> CutoffFn Creature -> App (Array Creature)
-evolve fn cutoff = do
-    { state } <- ask
-    { creatures } <- lift $ Ref.read state
+evolve :: forall r. FitnessFn Creature -> CutoffFn Creature ->  Array Creature -> Evolution r (Array Creature)
+evolve fn cutoff creatures = do
+    { habitat } <- ask
     let percentageIndexFor x l = floor $ x * (toNumber $ length l)
     --let survivalThreshold = percentageIndexFor 0.5 creatures
 
     let fit = sortWith fn $ filter cutoff creatures
-    let elitism = percentageIndexFor 0.1 fit
+        genomes = _.genome <$> fit
 
-    let { before: elites, after: breeding } = splitAt elitism fit
-    let genomes = (\c -> c.genome) <$> breeding
+        elitism = percentageIndexFor 0.1 fit
+        { before: elites, after: breeding } = splitAt elitism genomes
 
-    let diff = length creatures - length genomes - length elites
-    fillers <- lift $ randomlyTake diff genomes
+        diff = length creatures - length fit
+
+    fillers <- lift $ randomlyTake diff breeding
     
     -- Debug.traceM $ "Current gen num: " <> (show $ length creatures)
     -- Debug.traceM $ "Fit num: " <> (show $ length fit)
@@ -131,19 +142,16 @@ evolve fn cutoff = do
     -- Debug.traceM $ "Diff: " <> (show diff)
     -- Debug.traceM $ "Fillers num: " <> (show $ length fillers)
 
-
-    offspring <- lift $ produceOffspring (genomes <> fillers)
+    offspring <- lift $ produceOffspring (breeding <> fillers)
     mutated <- traverse mutate offspring
-    newGeneration <- traverse create mutated
-    let all =  elites <> newGeneration
-
-    -- _ <- for all \c -> Debug.traceM $ "Creature genomeID: " <> genome c.genome <> "\nColor: " <> toHexString c.color
+    newGeneration <- lift $ traverse (create habitat) (mutated <> elites)
 
     Debug.traceM "\nEvolving!"
-    let groups = groupAllBy (\c1 c2 -> compare c1.brain c2.brain) all
+    let groups = groupAllBy (\c1 c2 -> compare c1.brain c2.brain) newGeneration
     _ <- for groups \g -> 
         let (NN { id }) = (NEA.head g).brain in 
             Debug.traceM $ "For genome: " <> id <> ": group size -> " <> (show $ NEA.length g)
 
-    pure $ take (length creatures) all
+    
+    pure $ take (length creatures) newGeneration
 

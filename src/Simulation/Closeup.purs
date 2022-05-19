@@ -3,24 +3,30 @@ module Simulation.Closeup where
 
 import Prelude
 
+import App.Graphics (Graphics)
 import Control.Monad.Reader (ask, lift, runReaderT)
+import Creature (Creature)
 import Creature as C
-import Data.Maybe (maybe)
+import Data.Maybe (Maybe, maybe)
 import Data.Vector (Vec(..))
-import Effect.Ref as Ref
-import Graphics.Canvas (fillPath, rect, scale, setFillStyle, setTransform)
-import Simulation.Types (App)
-import Web.HTML.Window (RequestAnimationFrameId, requestAnimationFrame)
+import Graphics.Canvas (fillPath, rect, setFillStyle)
+import Web.HTML.Window (RequestAnimationFrameId, Window, requestAnimationFrame)
 
 
 dimensions :: { height :: Number , width :: Number }
 dimensions = { width: 200.0, height: 200.0 }
 
-draw :: App Unit
-draw = do
-    { ctx, state } <- ask
-    { closeUp } <- lift $ Ref.read state
 
+
+
+type Inspector r = (creature :: Maybe Creature | r)
+
+
+
+draw :: forall (r :: Row Type). Graphics (Inspector r) Unit
+draw = do
+    { ctx, creature } <- ask
+    
     lift $ do
         setFillStyle ctx "#EDEDED"
         fillPath ctx $ rect ctx
@@ -30,14 +36,14 @@ draw = do
             , height: dimensions.height
             }
     let scaled c = c { radius = c.radius * 5.0, pos = Vec [100.0, 100.0]}
-    maybe (pure unit) (C.draw <<< scaled) closeUp
+    maybe (pure unit) (C.draw <<< scaled) creature
 
  
             
-step:: App RequestAnimationFrameId
+step:: forall (r :: Row Type). Graphics (Inspector r) RequestAnimationFrameId
 step = do
   deps@{ window } <- ask
-  draw 
+  draw
   lift $ requestAnimationFrame (runReaderT (void step) deps) window
 
 

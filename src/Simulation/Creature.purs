@@ -1,5 +1,7 @@
 module Creature
-  ( boundingBox
+  ( Action(..)
+  , Creature
+  , boundingBox
   , collided
   , colorFromString
   , create
@@ -7,7 +9,7 @@ module Creature
   , draw
   , intersects
   , move
-  , randomRotate
+  , nextAction
   , rotate
   , update
   )
@@ -15,36 +17,54 @@ module Creature
 
 import Prelude
 
-import Brains.Genome (Gene(..), Genome, genome)
-import Brains.NeuralNetwork (SumNum(..), fromGenome, run)
+import App.Graphics (Graphics)
+import Brains.Genome (Gene(..), Genome)
+import Brains.NeuralNetwork (NeuralNetwork, SumNum(..), fromGenome, run)
 import Color (Color, ColorSpace(..), black, fromHexString, mix, rgb, toHexString)
 import Control.Alt ((<|>))
 import Control.Monad.Cont.Trans (lift)
 import Control.Monad.Reader (ask)
-import Control.Monad.Rec.Class (Step(..), tailRecM)
 import Data.Array (concat, delete, find, foldl, take, unsafeIndex)
 import Data.Char (toCharCode)
-import Data.Foldable (fold)
-import Data.Int (floor, toNumber)
+import Data.Int (toNumber)
 import Data.Int.Bits (shl, shr, (.&.))
 import Data.Maths (Degrees, toRads)
 import Data.Maybe (fromMaybe, maybe)
+import Data.Ord (abs)
 import Data.String (Pattern(..), length, split)
 import Data.String.Unsafe (char)
 import Data.Traversable (traverse)
 import Data.Vector (Two, Vec(..), scale, vAdd, x, y, distance)
 import Data.Vector as V
-import Debug as Debug
 import Effect (Effect)
 import Effect.Random (randomInt, randomRange)
-import Effect.Ref as Ref
 import Geometry (BoundingBox, Position(..))
 import Graphics.Canvas (arc, beginPath, closePath, fillPath, lineTo, moveTo, setFillStyle, setStrokeStyle, stroke)
-import Habitat (checkOutOfBounds, hitEdge)
+import Habitat (Habitat, Edge, hitEdge)
 import Math (cos, sin)
 import Math as Number
 import Partial.Unsafe (unsafePartial)
-import Simulation.Types (Action(..), App, Creature)
+
+
+
+type Creature = 
+    { color :: Color
+    , radius :: Number
+    , pos :: Vec Two Number
+    , orientation :: Vec Two Number
+    , vision ::
+        { left :: Vec Two Number
+        , right :: Vec Two Number
+        }
+    , speed :: Number
+    , brain :: NeuralNetwork
+    , genome :: Genome
+    , debug :: Boolean
+    , hover :: Boolean
+    } 
+
+data Action 
+    = HitEdge Edge | Collided Creature | Move 
 
 
 
@@ -64,39 +84,42 @@ colorFromString g
 
 
 
-create :: Genome -> App Creature
-create g = do
-    { state } <- ask
-    { habitat } <- lift $ Ref.read state
+create :: Habitat -> Genome -> Effect Creature
+create habitat g = do
     let 
         radiusE = map toNumber $ randomInt 5 10
-        speedE = randomInt 1 2
+        speedE = randomRange 1.0 4.0
         posE = do
             r <- radiusE
             x <- randomRange r $ (toNumber habitat.width - r)
             y <- randomRange r $ (toNumber habitat.height - r)
-            pure $ Vec $ [x, y]
+            pure $ Vec [x, y]
+            -- offsetX <- randomRange (-100.0) 100.0
+            -- offsetY <- randomRange (-100.0) 100.0
+
+            -- pure $ Vec $ [toNumber habitat.width /2.0 + offsetX, toNumber habitat.height /2.0 + offsetY]
 
         orientationE :: Effect (Vec Two Number)
         orientationE = do
-            x <- randomRange 0.0 1.0
-            let y = 1.0 - x 
-            pure $ Vec [x, y]
+            x <- randomRange (-1.0) 1.0
+            sign <- randomInt 0 1
+            let y = (1.0 - abs x) 
+            pure $ Vec [x, if sign == 1 then y else (-y)]
         
         genomeColors = traverse (traverse \(Gene { id }) -> fromHexString ("#" <> id)) g
         blend = concat >>> (foldl (\a c -> mix RGB a c 0.5) black)
 
-    lift $ do
-        radius <- radiusE
-        speed <- speedE
-        pos <- posE
-        orientation <- orientationE
+ 
+    radius <- radiusE
+    speed <- speedE
+    pos <- posE
+    orientation <- orientationE
 
-        let color = maybe black blend genomeColors
-        let brain = fromGenome g
-        let vision = { left: V.rotate (-30.0) orientation, right: V.rotate 30.0 orientation }
+    let color = maybe black blend genomeColors
+        brain = fromGenome g
+        vision = { left: V.rotate (-30.0) orientation, right: V.rotate 30.0 orientation }
 
-        pure $ { color, radius, orientation, speed, pos, vision, brain, genome: g, debug: false, hover: false }
+    pure $ { color, radius, orientation, speed, pos, vision, brain, genome: g, debug: false, hover: false }
 
        
 
@@ -108,7 +131,7 @@ boundingBox c = {
 }
 
 
-drawLine :: String -> Vec Two Number -> Vec Two Number -> App Unit
+drawLine :: forall (r :: Row Type). String -> Vec Two Number -> Vec Two Number -> Graphics r Unit
 drawLine color p1 p2 = do
     { ctx } <- ask
     lift $ do
@@ -119,7 +142,7 @@ drawLine color p1 p2 = do
         closePath ctx
         stroke ctx
 
-draw :: Creature -> App Unit
+draw :: forall (r :: Row Type). Creature -> Graphics r Unit
 draw { pos, radius, color, orientation, vision, debug, hover } = do
     { ctx } <- ask
     if debug || hover then do 
@@ -152,10 +175,8 @@ draw { pos, radius, color, orientation, vision, debug, hover } = do
 
 
 move :: Creature -> Creature
-move c = c 
-    { pos = vAdd c.pos $ scale factor c.orientation
-    }
-    where factor = toNumber c.speed
+move c = c { pos = vAdd c.pos $ scale c.speed c.orientation }
+
 
 
 rotate :: Degrees -> Creature -> Creature
@@ -166,53 +187,52 @@ rotate angle c = c
     where r = V.rotate angle
 
 
-randomRotate ::  Creature -> App Creature
-randomRotate c = tailRecM go c
-    where
-        go _c = do
-            angle <- lift $ randomRange 0.0 360.0
+-- randomRotate ::  Creature -> Effect Creature
+-- randomRotate c = tailRecM go c
+--     where
+--         go _c = do
+--             { habitat } <- ask
+--             angle <- lift $ randomRange 0.0 360.0
             
-            let rotated = rotate angle _c
-            out <- checkOutOfBounds $ boundingBox $ move rotated
+--             let rotated = rotate angle _c
+--             let out = checkOutOfBounds habitat $ boundingBox $ move rotated
       
-            pure $ if out 
-                then Loop _c
-                else Done $ move rotated
+--             pure $ if out 
+--                 then Loop _c
+--                 else Done $ move rotated
 
 
-dispatch :: Action -> Creature -> App Creature
-dispatch Move c = pure $ move c
-dispatch (HitEdge _) c = pure c
-dispatch (Collided _) c = pure $ move c 
+dispatch :: Action -> Creature -> Creature
+dispatch Move c = move c
+dispatch (HitEdge _) c = c
+dispatch (Collided _) c = move c 
 
    
-nextAction :: Creature -> App Action
-nextAction c = do 
-    { state } <- ask
-    { creatures } <- lift $ Ref.read state
-    let bb = boundingBox c
-    me <- hitEdge bb
-    let mc = Collided <$> find (collided c) (delete c creatures)
-    pure $ fromMaybe Move (HitEdge <$> me <|> mc)
+
+nextAction :: Habitat -> Array Creature -> Creature -> Action
+nextAction habitat creatures c = fromMaybe Move (HitEdge <$> me <|> Collided <$> mc)
+    where
+        bb = boundingBox c
+        me = hitEdge habitat bb
+        mc = find (collided c) (delete c creatures)
 
 
-      
 
-update :: Creature -> App Creature
-update c = unsafePartial $ do
-    a <- nextAction c
-    --let input = [x c.pos, y c.pos, x c.orientation, y c.orientation, toNumber c.speed]
-    let input = [x c.orientation, y c.orientation]
-    let out = take 2 $ fromMaybe (Sum <$> input) $ run c.brain input
-    let (Sum degrees) = unsafeIndex out 0 
-    let (Sum speed) = unsafeIndex out 1 
-    let r = toRads degrees
-    let o =  Vec [cos r, sin r]
-    dispatch a $ c { 
+update :: Action -> Creature -> Creature
+update a c = dispatch a $ c { 
         orientation = o, 
         vision = { left: V.rotate (-30.0) o, right: V.rotate 30.0 o  },
-        speed = min (floor speed) 4
+        speed = min speed 4.0
     }
+    where 
+        --let input = [x c.pos, y c.pos, x c.orientation, y c.orientation, toNumber c.speed]
+        input = [x c.orientation, y c.orientation]
+        out = take 2 $ fromMaybe (Sum <$> input) $ run c.brain input
+        (Sum degrees) = unsafePartial $ unsafeIndex out 0 
+        (Sum speed) = unsafePartial $  unsafeIndex out 1 
+        r = toRads $ degrees * 360.0
+        o =  Vec [cos r, sin r]
+   
 
 
 intersects :: Position -> Creature -> Boolean
