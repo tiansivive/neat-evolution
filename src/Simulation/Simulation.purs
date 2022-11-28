@@ -1,6 +1,5 @@
 module Simulation
-  ( Animation(..)
-  , Config
+  ( Config
   , Generation
   , Log
   , Seconds
@@ -18,28 +17,30 @@ module Simulation
 
 import Prelude
 
-import App.Graphics (DrawDependencies, Graphics, render)
+import App.Graphics (DrawDependencies)
 import Brains.Genome (GenomeID, network)
-import Brains.NEAT (Config, BrainSize, evolve) as NEAT
-import Control.Monad.RWS (RWST, execRWST, get, modify, modify_, runRWST, tell)
+import Brains.NEAT (Config, evolve) as NEAT
+import Control.Monad.RWS (RWST, get, modify_, tell)
 import Control.Monad.Reader (lift, runReaderT)
 import Control.Monad.Reader.Trans (ask)
-import Creature (Creature, collided, create)
-import Creature (create, draw, nextAction, rotate, update) as C
+import Control.Monad.State.Trans (modify)
+import Creature (Creature, collided)
+import Creature (create, nextAction, rotate, update) as C
 import Data.Array (delete, find, replicate, zipWith)
 import Data.Int (toNumber)
 import Data.List.Lazy (List, singleton)
 import Data.Map (Map, empty)
 import Data.Maybe (Maybe(..))
-import Data.Traversable (sequence, traverse, traverse_)
+import Data.Traversable (sequence, traverse)
 import Data.Vector (x)
 import Debug as Debug
 import Effect (Effect)
 import Effect.Random (randomRange)
-import Habitat (Habitat, draw) as H
+import Effect.Ref (Ref)
+import Effect.Ref as Ref
+import Habitat (Habitat) as H
 import Type.Function (type ($))
 import Type.Row (type (+))
-import Web.HTML.Window (requestAnimationFrame)
 
 
 type Seconds = Int
@@ -58,43 +59,34 @@ type Generation r = { creatures:: Array Creature, genomes :: Map GenomeID Int | 
 type Selection = Generation (elites :: Array GenomeID, scores :: Map GenomeID (Array Number))
 
 
-data Animation = Running | Paused 
 
 data SimState
     = Idle 
     | Start
-    | Animation Animation
     | Simulating
     | Evolving
     | Completed
 
 
 type Log = List Selection 
-type Step = Generation ( step :: Int, currentGen :: Int, state :: SimState )
+type Step = Ref $ Generation ( step :: Int, currentGen :: Int, state :: SimState )
 type Simulation = RWST (Record $ Config + DrawDependencies ()) Log Step Effect
 
 
 
-draw :: Graphics (creatures:: Array Creature, habitat:: H.Habitat) Unit
-draw = do
-  deps@{ creatures } <- ask
-  lift $ render H.draw deps
-  lift $ render (traverse_ C.draw creatures) deps 
- 
 
-  
-
-simStep:: Partial => Simulation Unit
+simStep:: Partial =>  Simulation Unit
 simStep = do
-    deps@{ totalGens, ttlGen, habitat, ctx, window } <- ask
-    st@{ creatures, state, currentGen, step } <- get
+    deps@{ totalGens, ttlGen, habitat } <- ask
+    r <- get
+    { creatures, state, currentGen, step } <- lift $ Ref.read r
 
     let 
       evolve = lift $ runReaderT (NEAT.evolve (fitness habitat) (cutoff habitat) creatures) deps
       next = if step == 60 * ttlGen -- 60 fps, ttl is in secs
         then do
           tell $ singleton { elites: [], creatures, genomes: empty, scores: empty }
-          modify_ _ { state = Evolving, step = 0 }
+          modify \ref -> Ref.newWithSelf _ { state = Evolving, step = 0 } ref
         else do 
           --Debug.traceM $ "Simulating step: " <> show step <> " for gen " <> show currentGen
         
@@ -117,12 +109,6 @@ simStep = do
         Simulating -> do
           next
           simStep 
-        Animation Paused -> simStep
-        Animation Running -> do
-          lift $ render draw { creatures, habitat, ctx, window }
-          _ <- lift $ requestAnimationFrame (void $ runRWST next deps st) window
-          pure unit
-
         _ -> simStep
 
 
@@ -131,11 +117,6 @@ simStep = do
       else modify_ _ { state = Completed }
       
 
-
-run :: Partial => Record $  Config + DrawDependencies () -> Step -> Effect Unit
-run conf st = do
-  _ <- runRWST simStep conf st
-  pure unit
 
 
 

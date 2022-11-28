@@ -2,6 +2,7 @@ module App.App
   ( App
   , AppState(..)
   , Bounds
+  , Control(..)
   , Environment
   , State
   )
@@ -9,19 +10,18 @@ module App.App
 
 import Prelude
 
-
 import Control.Monad.Reader (ReaderT)
 import Effect (Effect)
 import Effect.Ref (Ref)
 import Graphics.Canvas (Context2D)
-import Simulation (Simulation, Config)
+import Simulation (Config, Simulation, Step)
 import Simulation.Closeup (Inspector)
 import Web.HTML (Window)
 import Web.HTML.Window (RequestAnimationFrameId)
 
 type Bounds = { w:: Number, h:: Number}
 
-
+data Control = Animation | Simulation
 data AppState = Configuring (Record (Config ())) | Running | Paused
 
 type Environment = 
@@ -33,7 +33,8 @@ type Environment =
 
 -- TODO: Encode the relationship between closeUp and selected into the type signature, perhaps via some ADT
 type State =
-    { simulation        :: Simulation Unit
+    { simulation        :: Step
+    , control           :: Control
     , appState          :: AppState
     , inspector         :: Record (Inspector ())
     }
